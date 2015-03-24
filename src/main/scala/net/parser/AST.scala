@@ -1,3 +1,7 @@
+package net.parser
+
+//import scalaz.NonEmptyList -- can it be used with Seq?
+
 object AST {
 	
 	sealed trait SExpr
