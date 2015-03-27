@@ -49,6 +49,10 @@ class ParserTest extends FlatSpec {
 	"The Lisp Parser" should "parse a simple SExpression #2" in {
 		val result = new LispParser("(+ x (+ y 1))").SExpr.run()
 		assert(result == Success(Comb(List(Ident("+"), Ident("x"), Comb(List(Ident("+"), Ident("y"), Number(1)))))))
-
 	}	
+
+	"The Lisp Parser" should "parse a simple if expression" in {
+		val result = new LispParser("(if (> 10 20) (+ 1 1) (+ 3 3))").SExpr.run()
+		assert(result == Success(Comb(List(Ident("if"), Comb(List(Ident(">"), Number(10), Number(20))), Comb(List(Ident("+"), Number(1), Number(1))), Comb(List(Ident("+"), Number(3), Number(3)))))))
+	}
 }

@@ -19,4 +19,20 @@ class InterpretterTest extends FlatSpec {
 		})
 	}	
 
+	"The Lisp Interpretter" should "handle 'if' statements when test == false" in {
+		val parsed = new LispParser("(if (> 10 20) (+ 1 1) (+ 3 3))").SExpr.run()
+		val evalResult = Interpretter.evaluate(parsed.get)
+		parsed.foreach({ x =>
+			assert( Interpretter.evaluate(x) == Right(6) )
+		})
+	}		
+
+	"The Lisp Interpretter" should "handle 'if' statements when test == true" in {
+		val parsed = new LispParser("(if (> 50 20) (+ 1 1) (+ 3 3))").SExpr.run()
+		val evalResult = Interpretter.evaluate(parsed.get)
+		parsed.foreach({ x =>
+			assert( Interpretter.evaluate(x) == Right(2) )
+		})
+	}			
+
 }
