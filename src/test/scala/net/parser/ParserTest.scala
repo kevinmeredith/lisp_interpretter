@@ -55,4 +55,9 @@ class ParserTest extends FlatSpec {
 		val result = new LispParser("(if (> 10 20) (+ 1 1) (+ 3 3))").SExpr.run()
 		assert(result == Success(Comb(List(Ident("if"), Comb(List(Ident(">"), Number(10), Number(20))), Comb(List(Ident("+"), Number(1), Number(1))), Comb(List(Ident("+"), Number(3), Number(3)))))))
 	}
+
+	"The Lisp Parser" should "fail if the SExpression has unmatched input" in {
+		val result = new LispParser("(bippy) bad bad bad").SExpr.run() 
+		println(result)
+	}	
 }

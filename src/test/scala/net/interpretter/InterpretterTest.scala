@@ -2,6 +2,7 @@ package net.interpretter
 
 import org.scalatest._
 import net.parser.LispParser
+import net.interpretter.Interpretter._
 
 class InterpretterTest extends FlatSpec {
 	
@@ -19,7 +20,35 @@ class InterpretterTest extends FlatSpec {
 		})
 	}	
 
-	"The Lisp Interpretter" should "handle 'if' statements when test == false" in {
+	"The Lisp Interpretter" should "return true for a '>' test" in {
+		val parsed = new LispParser("(> 1000 1)").SExpr.run()
+		parsed.foreach({ x =>
+			assert( Interpretter.evaluate(x) == Right(true) )
+		})
+	}		
+
+	"The Lisp Interpretter" should "return false for a '>' test" in {
+		val parsed = new LispParser("(> 0 999)").SExpr.run()
+		parsed.foreach({ x =>
+			assert( Interpretter.evaluate(x) == Right(false) )
+		})
+	}		
+
+	"The Lisp Interpretter" should "return true for a '='' test" in {
+		val parsed = new LispParser("(= 65 65)").SExpr.run()
+		parsed.foreach({ x =>
+			assert( Interpretter.evaluate(x) == Right(true) )
+		})
+	}			
+
+	"The Lisp Interpretter" should "return false for a '='' test" in {
+		val parsed = new LispParser("(= 65 999)").SExpr.run()
+		parsed.foreach({ x =>
+			assert( Interpretter.evaluate(x) == Right(false) )
+		})
+	}				
+
+	"The Lisp Interpretter" should "handle 'if' statements when condition evaluates to false" in {
 		val parsed = new LispParser("(if (> 10 20) (+ 1 1) (+ 3 3))").SExpr.run()
 		val evalResult = Interpretter.evaluate(parsed.get)
 		parsed.foreach({ x =>
@@ -27,12 +56,52 @@ class InterpretterTest extends FlatSpec {
 		})
 	}		
 
-	"The Lisp Interpretter" should "handle 'if' statements when test == true" in {
+	"The Lisp Interpretter" should "handle 'if' statements when condition evaluates to true" in {
 		val parsed = new LispParser("(if (> 50 20) (+ 1 1) (+ 3 3))").SExpr.run()
 		val evalResult = Interpretter.evaluate(parsed.get)
 		parsed.foreach({ x =>
 			assert( Interpretter.evaluate(x) == Right(2) )
 		})
+	}
+
+	"The Lisp Interpretter" should "print out the un-evaluated expression for the 'quote' keyword" in {
+		val parsed = new LispParser("(quote (+ 10 20))").SExpr.run()
+		val evalResult = Interpretter.evaluate(parsed.get)
+		parsed.foreach({ x =>
+			assert( Interpretter.evaluate(x) == Right("(+ 10 20)") )
+		})
+	}	
+
+	"The Lisp Interpretter" should "print out the un-evaluated expression for the 'quote' keyword #2" in {
+		val parsed = new LispParser("(quote 555foobar)").SExpr.run()
+		val evalResult = Interpretter.evaluate(parsed.get)
+		parsed.foreach({ x =>
+			assert( Interpretter.evaluate(x) == Right("555foobar") )
+		})
+	}		
+
+	"The Lisp Interpretter" should "print out the un-evaluated expression for the 'quote' keyword #3" in {
+		val parsed = new LispParser("(quote (+ 10 (+ 3 4)))").SExpr.run()
+		val evalResult = Interpretter.evaluate(parsed.get)
+		parsed.foreach({ x =>
+			assert( Interpretter.evaluate(x) == Right("(+ 10 (+ 3 4))") )
+		})
 	}			
 
+	"The Lisp Interpretter" should "fail an 'if-statement' if the condition is a 'quote'" in {
+		val parsed = new LispParser("(if (quote 100) 555 666)").SExpr.run()
+		val evalResult = Interpretter.evaluate(parsed.get)
+		parsed.foreach({ x =>
+			assert( Interpretter.evaluate(x) == Left(BadIfError) )
+		})
+	}	
+
+	"The Lisp Interpretter" should "success for an 'if-statement' if the condition evaluates to true," + 
+		"and the consequential action is a quote " in {
+		val parsed = new LispParser("(if (= 0 0) (quote 555) 666)").SExpr.run()
+		val evalResult = Interpretter.evaluate(parsed.get)
+		parsed.foreach({ x =>
+			assert( Interpretter.evaluate(x) == Right("555"))
+		})
+	}		
 }
