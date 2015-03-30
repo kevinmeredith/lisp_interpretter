@@ -12,7 +12,7 @@ class LispParser(val input: ParserInput) extends Parser {
 
 	import LispParser._
 
-	def SExprComplete: Rule1[AST.SExpr] = rule { SExpr ~ EOI }
+	def SExprComplete: Rule1[AST.SExpr] = rule { SExpr ~ Spaces ~ EOI }
 	def SExpr: Rule1[AST.SExpr]         = rule { Atom | '(' ~ oneOrMore(Comb).separatedBy(Spaces) ~ ')' ~> (_.toList) ~> (AST.Comb(_)) }
 	def Comb:  Rule1[AST.SExpr]       	= rule {  Spaces ~ SExpr ~ Spaces }
 	def Atom:  Rule1[AST.Atom]        	= rule { Num | Ident }
