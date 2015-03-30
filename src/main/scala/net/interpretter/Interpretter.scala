@@ -9,25 +9,32 @@ object Interpretter {
 	case object UnknownIdentError  extends InterpretterError
 	case object UnknownError       extends InterpretterError
 	case object BadDefineError     extends InterpretterError
+	case object EmptyExpression	   extends InterpretterError
+	case object ProcError		   extends InterpretterError
 	
 	sealed trait MathError extends InterpretterError
 	case class NotAnInt(x: String) extends MathError
 
-	val plusZero: Either[MathError, Int] = Right(0)
+	val plusZero: Either[InterpretterError, Any] = Right(0)
 
-	type MapToMonoidOp = Function1[Map[String, Any], Function2[Either[MathError, Int], SExpr, Either[MathError, Int]]]
+	type MapToMonoidOp = Function1[Map[String, Any], Function2[Either[InterpretterError, Any], SExpr, Either[InterpretterError, Any]]]
 
 	val mathOps: Map[String, MapToMonoidOp] = Map(
-		"+" -> {(acc: Either[MathError, Int], elem: SExpr) => 
-			evaluate(elem)(_: MapToMonoidOp) match {
+		"+" -> addFn
+	)
+
+	private def addFn(m: Map[String, Any]): Function2[Either[InterpretterError, Any], SExpr, Either[InterpretterError, Any]] = {
+		(acc: Either[InterpretterError, Any], elem: SExpr) => {
+			evaluate(elem)(m) match {
 				case Right(x) => for {
-					a <- acc.right
-					i <- validateInt(x.toString).right // toString here???
-				} yield a + i
+					a     <- acc.right
+					a_int <- validateInt(a.toString).right
+					i 	  <- validateInt(x.toString).right // TODO: toString here???
+				} yield a_int + i
 				case left => left
 			}
 		}
-	)	
+	}
 
 	// TODO: deal with Ordering -- typeclass `Ord` in Haskell
 	// val : Map[String, Function2[Float, Float, Boolean]] = {
@@ -39,8 +46,6 @@ object Interpretter {
 			case Number(n) => Right(n)
 			case Ident(s)  => Right(s)
 			case Comb(es)  => es match {
-				case Ident(x) :: Nil 						     => Right(x)
-				case Number(x) :: Nil 						     => Right(x)
 				case Ident("if") :: test :: conseq :: alt :: Nil => handleIf(test, conseq, alt)(map)			
 				case Ident("quote") :: xs 						 => Right(xs.foldLeft("")(_ + _.toString))
 				case Ident("define") :: Ident(v) :: exp :: Nil   => handleDefine(v, exp)(map)
@@ -49,15 +54,21 @@ object Interpretter {
 				// case Ident("+") :: Number(x) :: Number(y) :: Nil => Right(x + y)
 				// case Ident("=") :: Number(x) :: Number(y) :: Nil => Right(x == y)	
 				// case Ident(_) :: _							     => Left(UnknownIdentError)
-				//case c @ Comb(_) :: xs						     => evaluate(c)(map)
+				//case c @ Comb(_) :: xs						     => evaluate(c)(map)				
+				case Nil										 => Left(EmptyExpression)
+				case _											 => Left(ProcError)
 			}
 		}
 
 	// TODO: run the repl -- parsing + evaluating
 
 	private def handleProc(proc: String, es: List[SExpr], map: Map[String, Any]): Either[InterpretterError, Any] = {
-		mathOps.get(proc) match {
-			case Some(f) => es.foldLeft(plusZero)(f(map))
+		es match {
+			case Nil    => Left(ProcError)
+			case _ :: _ => 	mathOps.get(proc) match {
+				case Some(f) => es.foldLeft(plusZero)(f(map))
+				case None    => ???
+			}
 		}
 	}
 
@@ -71,7 +82,7 @@ object Interpretter {
 			case _			  => Left(BadIfError) 
 		}
 
-	private def validateInt(x: String): Either[MathError, Int] = {
+	private def validateInt(x: String): Either[InterpretterError, Int] = {
 		try { 
 			Right( x.toInt )
 		}
