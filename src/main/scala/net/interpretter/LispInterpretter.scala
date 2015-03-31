@@ -2,7 +2,7 @@ package net.interpretter
 
 import net.parser.AST._
 
-object Interpretter {
+object LispInterpretter {
 	
 	sealed trait InterpretterError
 	case object BadIfError         extends InterpretterError
@@ -11,6 +11,7 @@ object Interpretter {
 	case object BadDefineError     extends InterpretterError
 	case object EmptyExpression	   extends InterpretterError
 	case object ProcError		   extends InterpretterError
+	case object NoVarExists		   extends InterpretterError
 	
 	sealed trait MathError extends InterpretterError
 	case class NotAnInt(x: String) extends MathError
@@ -68,9 +69,10 @@ object Interpretter {
 
 	def evaluate(e: SExpr)(map: Map[String, Any]): Either[InterpretterError, Any] = 
 		e match {
-			case Number(n) => Right(n)
-			case Ident(s)  => Right(s)
-			case Comb(es)  => es match {
+			case Number(n) 					    => Right(n)
+			case Ident(s) if (stringLiteral(s)) => Right(s)
+			case Ident(s)  					    => getVar(s)(map)
+			case Comb(es)  					    => es match {
 				case Ident("if") :: test :: conseq :: alt :: Nil => handleIf(test, conseq, alt)(map)			
 				case Ident("quote") :: xs 						 => Right(xs.foldLeft("")(_ + _.toString))
 				case Ident("define") :: Ident(v) :: exp :: Nil   => handleDefine(v, exp)(map)
@@ -79,6 +81,14 @@ object Interpretter {
 				case _											 => Left(ProcError)
 			}
 		}
+
+	private def getVar(v: String)(map: Map[String, Any]): Either[InterpretterError, Any] = 
+		map.get(v) match {
+			case None    => Left(NoVarExists)
+			case Some(x) => Right(x)
+		}
+
+	private def stringLiteral(x: String) = x.startsWith("\"") && x.endsWith("\"")
 
 	// TODO: run the repl -- parsing + evaluating
 

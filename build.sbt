@@ -8,6 +8,8 @@ libraryDependencies += "org.parboiled" %% "parboiled" % "2.1.0"
 
 libraryDependencies += "org.scalaz" %% "scalaz-core" % "7.1.1"
 
+"org.scalaz" %% "scalaz-effect" % "7.1.1"
+
 libraryDependencies += "org.scalatest" % "scalatest_2.11" % "2.2.1" % "test"
 
 // Fork JVM when `run`-ing SBT
