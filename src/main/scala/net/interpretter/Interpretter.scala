@@ -17,16 +17,7 @@ object Interpretter {
 
 	val plusZero: Either[InterpretterError, Any] = Right(0)
 
-	type AddOp      = Function2[Either[InterpretterError, Any], SExpr, Either[InterpretterError, Any]]
-	type MapToMonoidOp = Function1[Map[String, Any], AddOp]
-
-	val mathOps: Map[String, MapToMonoidOp] = Map(
-		"+" -> addFn
-	)
-
-	val compareOps: Map[String, Function2[List[SExpr], Map[String,Any], Either[InterpretterError, Boolean]]] = Map(
-		">" -> gtFn	
-	)
+	type AddOp = Function2[Either[InterpretterError, Any], SExpr, Either[InterpretterError, Any]]
 
 	private def addFn(m: Map[String, Any]): AddOp = {
 		(acc: Either[InterpretterError, Any], elem: SExpr) => {
@@ -37,32 +28,43 @@ object Interpretter {
 					i 	  <- validateInt(x.toString).right // TODO: toString here???
 				} yield a_int + i
 				case left => left
-			}
+			} 
 		}
 	}
 
-	// Continuously increasing
+	// Continuously decreasing (http://stackoverflow.com/q/29349946/409976)
 	private def gtFn(es: List[SExpr], m: Map[String, Any]): Either[InterpretterError, Boolean] = {
-		es match {
-			case _ :: xs => {
-				val is: Either[InterpretterError, List[(Int, Int)]] = for {
-					e    <- es
-					x    <- xs  // TODO: cleaner way to get tail?
-					res  <- evaluate(e)(m).right
-					resX <- evaluate(x)(m).right
-					i    <- validateInt(res.toString).right
-					iX   <- validateInt(resX.toString).right
-					} yield (i, iX)
-				is.right.map(_.forall(y => y._1 > y._2))
-			}
-			case Nil	=> Right(true)
-		}
-	} 
+		val evald: List[Either[InterpretterError, Any]] = es.map(evaluate(_)(m))
+		val cs: List[Either[InterpretterError, Int]]    = evald.map{x => x.right.flatMap{y: Any => validateInt(y.toString)} }
+		val ints: Either[InterpretterError, List[Int]]  = f(cs)
+		ints.right.map(increasing(_)) 
+	}
 
-	// TODO: deal with Ordering -- typeclass `Ord` in Haskell
-	// val : Map[String, Function2[Float, Float, Boolean]] = {
-	// 	">" => (_ > _),
-	// }
+	// DRY up - remove boilerplate from gtFn and eqFn
+	private def eqFn(es: List[SExpr], m: Map[String, Any]): Either[InterpretterError, Boolean] = {
+		val evald: List[Either[InterpretterError, Any]] = es.map(evaluate(_)(m))
+		val cs: List[Either[InterpretterError, Int]]    = evald.map{x => x.right.flatMap{y: Any => validateInt(y.toString)} }
+		val ints: Either[InterpretterError, List[Int]]  = f(cs)
+		ints.right.map(allEquals(_)) 
+	}
+
+	private def increasing(ys: List[Int]): Boolean = ys match {
+		case Nil     => true
+		case _ :: xs => ys.zip(xs).forall(y => y._1 > y._2)
+	}
+
+	private def allEquals[A](ys: List[A]): Boolean = ys match {
+		case Nil     => true
+		case _ :: xs => ys.zip(xs).forall(y => y._1 == y._2)
+	}	
+
+	private def f[A, B](es: List[Either[A, B]]): Either[A, List[B]] = 
+		es.foldRight[Either[A, List[B]]](Right(Nil)) {
+			(elem, acc) => elem match {
+				case Right(x) => acc.right.map(y => x :: y)
+				case Left(x)  => Left(x)
+			}
+		}
 
 	def evaluate(e: SExpr)(map: Map[String, Any]): Either[InterpretterError, Any] = 
 		e match {
@@ -81,13 +83,11 @@ object Interpretter {
 	// TODO: run the repl -- parsing + evaluating
 
 	private def handleProc(proc: String, es: List[SExpr], map: Map[String, Any]): Either[InterpretterError, Any] = {
-		es match {
-			case Nil    => Left(ProcError)
-			case _ :: _ => 	mathOps.get(proc) match {
-				case Some(f) if f == "+" => es.foldLeft(plusZero)(f(map))
-				case Some(f) if f == ">" => gtFn(es, map)
-				case None    => ???
-			}
+		proc match {
+			case "+" => es.foldLeft(plusZero)(addFn(map))
+			case ">" => gtFn(es, map)
+			case "=" => eqFn(es, map)
+			case _   => Left(ProcError)
 		}
 	}
 

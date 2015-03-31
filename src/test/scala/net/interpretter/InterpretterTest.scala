@@ -50,10 +50,10 @@ class InterpretterTest extends FlatSpec {
 		})
 	}				
 
-	"The Lisp Interpretter" should "return a number for a parenthesized Number" in {
+	"The Lisp Interpretter" should "return a ProcError for a parenthesized Number" in {
 		val parsed = new LispParser("((((1234))))").SExprComplete.run()
 		parsed.foreach({ x =>
-			assert( Interpretter.evaluate(x)(empty) == Right(1234) )
+			assert( Interpretter.evaluate(x)(empty) == Left(ProcError) )
 		})
 	}			
 
@@ -65,11 +65,11 @@ class InterpretterTest extends FlatSpec {
 		})
 	}		
 
-	"The Lisp Interpretter" should "handle a nested 'if' statement" in {
+	"The Lisp Interpretter" should "return a ProcError for an SExpr beginning with two open parens" in {
 		val parsed = new LispParser("((if (> 10 20) (+ 1 1) (+ 3 3)))").SExprComplete.run()
 		val evalResult = Interpretter.evaluate(parsed.get)(empty)
 		parsed.foreach({ x =>
-			assert( Interpretter.evaluate(x)(empty) == Right(6) )
+			assert( Interpretter.evaluate(x)(empty) == Left(ProcError) )
 		})
 	}		
 
