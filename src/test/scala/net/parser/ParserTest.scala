@@ -26,7 +26,7 @@ class ParserTest extends FlatSpec {
 		assert( result == Success(Comb(List(Ident("bippy")))) )
 	}			
 
-	"The Lisp Parser" should "parse a 2-parenthesized Ident" in {
+	"The Lisp Parser" should "fail on a doubley parenthesis Ident" in {
 		val result = new LispParser("((  BOOYAH ))").SExprComplete.run() 
 		assert( result == Success(Comb(List(Comb(List(Ident("BOOYAH")))))) )
 	}				

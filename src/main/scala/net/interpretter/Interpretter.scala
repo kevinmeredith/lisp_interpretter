@@ -17,13 +17,18 @@ object Interpretter {
 
 	val plusZero: Either[InterpretterError, Any] = Right(0)
 
-	type MapToMonoidOp = Function1[Map[String, Any], Function2[Either[InterpretterError, Any], SExpr, Either[InterpretterError, Any]]]
+	type AddOp      = Function2[Either[InterpretterError, Any], SExpr, Either[InterpretterError, Any]]
+	type MapToMonoidOp = Function1[Map[String, Any], AddOp]
 
 	val mathOps: Map[String, MapToMonoidOp] = Map(
 		"+" -> addFn
 	)
 
-	private def addFn(m: Map[String, Any]): Function2[Either[InterpretterError, Any], SExpr, Either[InterpretterError, Any]] = {
+	val compareOps: Map[String, Function2[List[SExpr], Map[String,Any], Either[InterpretterError, Boolean]]] = Map(
+		">" -> gtFn	
+	)
+
+	private def addFn(m: Map[String, Any]): AddOp = {
 		(acc: Either[InterpretterError, Any], elem: SExpr) => {
 			evaluate(elem)(m) match {
 				case Right(x) => for {
@@ -35,6 +40,24 @@ object Interpretter {
 			}
 		}
 	}
+
+	// Continuously increasing
+	private def gtFn(es: List[SExpr], m: Map[String, Any]): Either[InterpretterError, Boolean] = {
+		es match {
+			case _ :: xs => {
+				val is: Either[InterpretterError, List[(Int, Int)]] = for {
+					e    <- es
+					x    <- xs  // TODO: cleaner way to get tail?
+					res  <- evaluate(e)(m).right
+					resX <- evaluate(x)(m).right
+					i    <- validateInt(res.toString).right
+					iX   <- validateInt(resX.toString).right
+					} yield (i, iX)
+				is.right.map(_.forall(y => y._1 > y._2))
+			}
+			case Nil	=> Right(true)
+		}
+	} 
 
 	// TODO: deal with Ordering -- typeclass `Ord` in Haskell
 	// val : Map[String, Function2[Float, Float, Boolean]] = {
@@ -50,11 +73,6 @@ object Interpretter {
 				case Ident("quote") :: xs 						 => Right(xs.foldLeft("")(_ + _.toString))
 				case Ident("define") :: Ident(v) :: exp :: Nil   => handleDefine(v, exp)(map)
 				case Ident(proc) :: xs							 => handleProc(proc, xs, map)
-				// case Ident(">") :: Number(x) :: Number(y) :: Nil => Right(x > y)
-				// case Ident("+") :: Number(x) :: Number(y) :: Nil => Right(x + y)
-				// case Ident("=") :: Number(x) :: Number(y) :: Nil => Right(x == y)	
-				// case Ident(_) :: _							     => Left(UnknownIdentError)
-				//case c @ Comb(_) :: xs						     => evaluate(c)(map)				
 				case Nil										 => Left(EmptyExpression)
 				case _											 => Left(ProcError)
 			}
@@ -67,6 +85,7 @@ object Interpretter {
 			case Nil    => Left(ProcError)
 			case _ :: _ => 	mathOps.get(proc) match {
 				case Some(f) if f == "+" => es.foldLeft(plusZero)(f(map))
+				case Some(f) if f == ">" => gtFn(es, map)
 				case None    => ???
 			}
 		}
