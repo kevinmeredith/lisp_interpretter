@@ -3,7 +3,7 @@ package net.parser
 import scala.annotation.tailrec
 
 object AST {
-	
+
 	sealed trait SExpr
 	sealed trait Atom extends SExpr
 	case class Comb(sExprs: List[SExpr]) extends SExpr {
