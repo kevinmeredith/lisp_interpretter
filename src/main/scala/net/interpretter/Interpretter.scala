@@ -66,7 +66,7 @@ object Interpretter {
 		es match {
 			case Nil    => Left(ProcError)
 			case _ :: _ => 	mathOps.get(proc) match {
-				case Some(f) => es.foldLeft(plusZero)(f(map))
+				case Some(f) if f == "+" => es.foldLeft(plusZero)(f(map))
 				case None    => ???
 			}
 		}
