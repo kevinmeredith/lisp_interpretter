@@ -19,11 +19,16 @@ object AST {
 
 	def printSExprs(xs: List[SExpr]): String = 
 		xs.foldLeft("") {
-				(acc: String, elem: SExpr) => {
-					acc match {
-						case "" => elem.toString
-						case _  => acc + " " + elem.toString
-					}
+			(acc: String, elem: SExpr) => {
+				acc match {
+					case "" => elem.toString
+					case _  => acc + " " + elem.toString
 				}
 			}
+		}
+
+
+	sealed trait Lambda
+	case class Fn(f: AnyRef) // Parent of Function1, Function2, etc.
+
 }

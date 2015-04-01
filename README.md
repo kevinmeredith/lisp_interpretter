@@ -2,7 +2,8 @@
 
 ## Overview
 
-This code implements a parser, interpretter, and REPL for a simple Lisp.
+This code implements a parser, interpretter, and REPL for a 
+simple [norvig.com-inspired](http://norvig.com/lispy.html) Lisp.
 
 It uses [parboiled2](parboiled2.org) for parsing. Upon a successful parse, an
 `net.parser.AST.SExpr` instance gets returned.

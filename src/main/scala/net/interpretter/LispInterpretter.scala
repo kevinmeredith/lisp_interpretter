@@ -20,13 +20,49 @@ object LispInterpretter {
 				case Ident("quote") :: xs 						 => Right((xs.foldLeft("")(_ + _.toString)), map)
 				case Ident("define") :: Ident(v) :: exp :: Nil   => handleDefine(v, exp)(map)
 				case Ident("set!") :: Ident(v) :: xs 			 => handleSet(v, map, xs)
-				case Ident(proc) :: xs							 => handleProc(proc, xs, map)
+				case Ident("lambda") :: xs 			             => handleLambda(xs, map)(_)
+				case Ident(proc) :: xs							 => handleProc(proc, xs, map) // TODO: update for lambda
 				case Nil										 => Left((EmptyExpression, map))
 				case _											 => Left((ProcError, map))
 			}
 		}
 
-	type AddOp = Function2[Either[InterpretterError, Any], SExpr, Either[InterpretterError, Any]]		
+// examples:
+//(lambda (r) (* pi (* r r)))
+//(lambda (r x) (* pi (* r x)))
+
+	private def handleLambda(es: List[SExpr], map: M)(inputs: List[Any]): Either[(InterpretterError, M), (Any, M)] = es match {
+		case Comb(es) :: fn :: Nil => handleFunction(es, map, fn)
+		case _ 				       => Left((InvalidLambda, map))
+	}
+
+	private def handleFunction(es: List[SExpr], map: M, fn: SExpr)(inputs: List[Any]): Either[(InterpretterError, M), (Any, M)] = for {
+		vars   <- getVars(es)
+		locals <- getAppliedValues(vars, inputs) 
+	} yield getFn(map, fn, locals)
+
+	private def getAppliedValues(vars: List[String], inputs: List[Any]): Either[LambdaError, M] = {
+		if(vars.length == inputs.length) {
+			vars.zipWith(inputs).toMap
+		}
+		else {
+			Left(WrongNumArgs(vars, inputs))
+		}
+	}
+
+	private def getFn(map: M, fn: SExpr, locals: M): Either[(InterpretterError, M), (Any, M)] = for {
+		(result, _) <- evaluate(fn)(map + locals).right // favor local variables over REPL globals
+	} yield (result, map) // return original map since 'lambda' may not alter 
+
+	private def getVars(es: List[SExpr]): Either[InvalidLambda, List[String]] = for {
+		e <- es
+		v <- extractIdent(e)
+	} yield v
+
+	private def extractIdent(x: SExpr): Either[InvalidLambda, String] = x match {
+		case Ident(v) => Right(v)
+		case _        => Left(BadLambda)
+	}
 
 	private def handleSet(v: String, map: M, es: List[SExpr]): Either[(InterpretterError, M), (Any, M)] = es match {
 		case Ident(x) :: Nil    => Right(((),map + (v -> x)))
@@ -39,6 +75,8 @@ object LispInterpretter {
 		}
 		case _ 				    => Left((SetError, map))
 	}
+
+	type AddOp = Function2[Either[InterpretterError, Any], SExpr, Either[InterpretterError, Any]]		
 
 	private def addFn(m: M): AddOp = {
 		(acc: Either[InterpretterError, Any], elem: SExpr) => {
