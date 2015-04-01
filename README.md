@@ -66,6 +66,5 @@ There are two [Scalatest](http://www.scalatest.org/) tests:
 
 ## TODO
 
-* test `setenv! var value`
 * add `lambda` 
 * show actual text when user types it in the REPL
