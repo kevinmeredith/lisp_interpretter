@@ -10,7 +10,7 @@ object LispInterpretter {
 
 	type M = Map[String, Any]
 
-	def evaluate(e: SExpr)(map: Map[String, Any]): Either[(InterpretterError, M), (Any, M)] =
+	def evaluate(e: SExpr)(map: M): Either[(InterpretterError, M), (Any, M)] =
 		e match {
 			case Number(n) 					    => Right((n, map))
 			case Ident(s) if (stringLiteral(s)) => Right((s,map))
@@ -19,6 +19,7 @@ object LispInterpretter {
 				case Ident("if") :: test :: conseq :: alt :: Nil => handleIf(test, conseq, alt)(map)
 				case Ident("quote") :: xs 						 => Right((xs.foldLeft("")(_ + _.toString)), map)
 				case Ident("define") :: Ident(v) :: exp :: Nil   => handleDefine(v, exp)(map)
+				case Ident("set!") :: Ident(v) :: xs 			 => handleSet(v, map, xs)
 				case Ident(proc) :: xs							 => handleProc(proc, xs, map)
 				case Nil										 => Left((EmptyExpression, map))
 				case _											 => Left((ProcError, map))
@@ -27,13 +28,25 @@ object LispInterpretter {
 
 	type AddOp = Function2[Either[InterpretterError, Any], SExpr, Either[InterpretterError, Any]]		
 
-	private def addFn(m: Map[String, Any]): AddOp = {
+	private def handleSet(v: String, map: M, es: List[SExpr]): Either[(InterpretterError, M), (Any, M)] = es match {
+		case Ident(x) :: Nil    => Right(((),map + (v -> x)))
+		case Number(x) :: Nil   => Right(((), map + (v -> x)))
+		case (c @ Comb(_)) :: Nil => {
+			evaluate(c)(map) match {
+				case Right((x, m)) => Right(((), m + (v -> x)))
+				case Left((x, m))  => Left((x, m))
+			}
+		}
+		case _ 				    => Left((SetError, map))
+	}
+
+	private def addFn(m: M): AddOp = {
 		(acc: Either[InterpretterError, Any], elem: SExpr) => {
 			evaluate(elem)(m) match {
 				case Right((x, _)) => for {
 					a     <- acc.right
 					a_int <- validateInt(a.toString).right
-					i 	  <- validateInt(x.toString).right // TODO: toString here???
+					i 	  <- validateInt(x.toString).right 
 				} yield a_int + i
 				case Left((x, _)) => Left(x)
 			} 
@@ -53,7 +66,7 @@ object LispInterpretter {
 		case Left((x, y))  => Left(x)
 	}
 
-	// DRY up - remove boilerplate from gtFn and eqFn
+	// TODO: DRY up - remove boilerplate from gtFn and eqFn
 	private def eqFn(es: List[SExpr], m: Map[String, Any]): Either[InterpretterError, Boolean] = {
 		val evald: List[Either[InterpretterError, Any]] = es.map(e => fst(evaluate(e)(m)))
 		val cs: List[Either[InterpretterError, Int]]    = evald.map{x => x.right.flatMap{y: Any => validateInt(y.toString)} }
@@ -71,6 +84,7 @@ object LispInterpretter {
 		case _ :: xs => ys.zip(xs).forall(y => y._1 == y._2)
 	}	
 
+	// similar to Haskell's 'seq', but specific to `Either`
 	private def f[A, B](es: List[Either[A, B]]): Either[A, List[B]] = 
 		es.foldRight[Either[A, List[B]]](Right(Nil)) {
 			(elem, acc) => elem match {
@@ -86,8 +100,6 @@ object LispInterpretter {
 		}
 
 	private def stringLiteral(x: String) = x.startsWith("\"") && x.endsWith("\"")
-
-	// TODO: run the repl -- parsing + evaluating
 
 	private def handleProc(proc: String, es: List[SExpr], map: Map[String, Any]): Either[(InterpretterError, M), (Any, M)] = {
 		val evald: Either[InterpretterError, Any] = proc match {

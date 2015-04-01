@@ -9,11 +9,19 @@ object Testing {
 		input.map{i => (i, i + "foobar")}
 	}
 
+	// see http://stackoverflow.com/questions/29374674/printing-input-function-output-with-io
 	def runExample: Unit = {
 		val (original, fnApplied) = simplePrint.unsafePerformIO
 		println(">" + original)
 		println(fnApplied)
 	}
+
+	def showInput: IO[Unit] = for {
+		c      <- getChar
+		_      <- putChar(c)
+	} yield ()
+
+	def validate(c: Char): IO[Unit] = if (c == 'A') IO(()) else showInput		
 
 	def runForever(m: Map[String, String]): IO[Unit] = for {
 		_ <- putStrLn(s"map:$m")

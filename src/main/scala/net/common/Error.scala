@@ -11,7 +11,7 @@ object Error {
 	case object EmptyExpression	   extends InterpretterError
 	case object ProcError		   extends InterpretterError
 	case object NoVarExists		   extends InterpretterError
-	case object SuccessfulDefine   extends InterpretterError
+	case object SetError		   extends InterpretterError
 
 	sealed trait MathError extends InterpretterError
 	case class NotAnInt(x: String) extends MathError

@@ -20,8 +20,8 @@ class LispParser(val input: ParserInput) extends Parser {
 	def Num:   Rule1[AST.Number]      	= rule { capture(Digits) ~> (_.toInt) ~> (AST.Number(_)) }
 	def Ident: Rule1[AST.Ident]       	= rule { capture(AnyString) ~> (_.toString) ~> (AST.Ident(_)) }
 	
-	def AnyString					    = rule { ("\"" ~ StringVal ~ "\"") | StringVal }
-	def StringVal 					  	= rule { oneOrMore( anyOf(lower) | anyOf(upper) | anyOf(numbers)) | MathOps }
+	def AnyString					    = rule { ("\"" ~ StringVal ~ "\"") | StringVal}
+	def StringVal 					  	= rule { oneOrMore( anyOf(lower) | anyOf(upper) | anyOf(numbers) | "!") | MathOps }
 	def MathOps						  	= rule { "+" | "-" | ">" | "<" | "=" }
 	def Digits 						  	= rule { oneOrMore(CharPredicate.Digit) }
 	def Spaces 						  	= rule { zeroOrMore(' ') }

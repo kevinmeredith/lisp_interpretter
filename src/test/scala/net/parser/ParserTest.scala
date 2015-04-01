@@ -66,6 +66,22 @@ class ParserTest extends FlatSpec {
 		assert(result == Success(Comb(List(Ident(("bippy"))))))
 	}		
 
+	"The Lisp Parser" should "succeed for a valid 'set!' SExpression" in {
+		val result = new LispParser("(set! x 100)").SExprComplete.run() 
+		assert(result == Success(Comb(List(Ident("set!"), Ident("x"), Number(100)))))
+	}			
+
+	"The Lisp Parser" should "fail for an invalid 'set!' SExpression using a string literal \"set!\"" in {
+		val result = new LispParser("(\"set!\" x 100)").SExprComplete.run() 
+		assertBadParse(result)
+	}				
+
+	"The Lisp Parser" should "succeed for a non-simple set! SExpression" in {
+		val result = new LispParser("(set! x (+ (+ 0 100) 1 2))").SExprComplete.run() 
+		assert(result == 
+			Success(Comb(List(Ident("set!"), Ident("x"), Comb(List(Ident("+"), Comb(List(Ident("+"), Number(0), Number(100))), Number(1), Number(2)))))))
+	}					
+
 	"The Lisp Parser" should "fails for a valid SExpresison, yet has extra whitespace + invalid characters" in {
 		val result = new LispParser("(bippy)      zzzzz ").SExprComplete.run() 
 		assertBadParse(result)
