@@ -27,8 +27,6 @@ object AST {
 			}
 		}
 
-
-	sealed trait Lambda
-	case class Fn(f: AnyRef) // Parent of Function1, Function2, etc.
-
+	sealed trait DefineOp
+	case object Op extends DefineOp	
 }

@@ -20,7 +20,7 @@ object LispInterpretter {
 				case Ident("quote") :: xs 						 => Right((xs.foldLeft("")(_ + _.toString)), map)
 				case Ident("define") :: Ident(v) :: exp :: Nil   => handleDefine(v, exp)(map)
 				case Ident("set!") :: Ident(v) :: xs 			 => handleSet(v, map, xs)
-				case Ident("lambda") :: xs 			             => handleLambda(xs, map)(_)
+				case Ident("lambda") :: xs 			             => handleLambda(xs, map)(_: List[Any])
 				case Ident(proc) :: xs							 => handleProc(proc, xs, map) // TODO: update for lambda
 				case Nil										 => Left((EmptyExpression, map))
 				case _											 => Left((ProcError, map))
@@ -31,33 +31,52 @@ object LispInterpretter {
 //(lambda (r) (* pi (* r r)))
 //(lambda (r x) (* pi (* r x)))
 
+	// Using default inputs in the event that no `define` accompanies the `inputs`.
 	private def handleLambda(es: List[SExpr], map: M)(inputs: List[Any]): Either[(InterpretterError, M), (Any, M)] = es match {
-		case Comb(es) :: fn :: Nil => handleFunction(es, map, fn)
-		case _ 				       => Left((InvalidLambda, map))
+		case Comb(es) :: fn :: Nil => handleFunction(es, map, fn)(inputs)
+		case _ 				       => Left((BadLambda, map))
 	}
 
-	private def handleFunction(es: List[SExpr], map: M, fn: SExpr)(inputs: List[Any]): Either[(InterpretterError, M), (Any, M)] = for {
-		vars   <- getVars(es)
-		locals <- getAppliedValues(vars, inputs) 
-	} yield getFn(map, fn, locals)
+	private def handleFunction(es: List[SExpr], map: M, fn: SExpr)(inputs: List[Any]): Either[(InterpretterError, M), (Any, M)] = {
+		val vars: Either[InvalidLambda, List[String]] = getVars(es)
+		vars match {
+			case Right(xs) => {
+				val locals: Either[InvalidLambda, M] = getAppliedValues(xs)(inputs)
+				locals match {
+					case Right(lcls) => applyFn(map, fn, lcls)
+					case Left(x)     => Left((x, map))
+				}
+			}
+			case Left(x)   => Left((x, map))
+		}
+	}
 
-	private def getAppliedValues(vars: List[String], inputs: List[Any]): Either[LambdaError, M] = {
+	private def getAppliedValues(vars: List[String])(inputs: List[Any]): Either[InvalidLambda, M] = {
 		if(vars.length == inputs.length) {
-			vars.zipWith(inputs).toMap
+			Right(vars.zip(inputs).toMap)
 		}
 		else {
 			Left(WrongNumArgs(vars, inputs))
 		}
 	}
 
-	private def getFn(map: M, fn: SExpr, locals: M): Either[(InterpretterError, M), (Any, M)] = for {
-		(result, _) <- evaluate(fn)(map + locals).right // favor local variables over REPL globals
-	} yield (result, map) // return original map since 'lambda' may not alter 
+	private def applyFn(map: M, fn: SExpr, locals: M): Either[(InterpretterError, M), (Any, M)] = for {
+		evald <- (evaluate(fn)(map ++ locals)).right // favor local variables over REPL globals
+		_ 	  <- excludeDefine(evald).right
+	} yield (evald._1, map) // return original map since 'lambda' may not alter 
 
-	private def getVars(es: List[SExpr]): Either[InvalidLambda, List[String]] = for {
-		e <- es
-		v <- extractIdent(e)
-	} yield v
+	private def excludeDefine(result: (Any, M)): Either[(InterpretterError, M), (Any, M)] = 
+		result match {
+			case ((Op, m)) => Left((DefineNotAllowed), m) 
+			case ((x, m))        => Right((x,m))
+		}
+
+	val initial: Either[InvalidLambda, List[String]] = Right(Nil)
+
+	private def getVars(es: List[SExpr]): Either[InvalidLambda, List[String]] =	
+		es.foldRight(initial){
+			(elem, acc) => acc.right.flatMap{a => extractIdent(elem).right.map(_ :: a) }
+		}
 
 	private def extractIdent(x: SExpr): Either[InvalidLambda, String] = x match {
 		case Ident(v) => Right(v)
@@ -92,7 +111,7 @@ object LispInterpretter {
 	}
 
 	// Continuously decreasing (http://stackoverflow.com/q/29349946/409976)
-	private def gtFn(es: List[SExpr], m: Map[String, Any]): Either[InterpretterError, Boolean] = {
+	private def gtFn(es: List[SExpr], m: M): Either[InterpretterError, Boolean] = {
 		val evald: List[Either[InterpretterError, Any]] = es.map(e => fst(evaluate(e)(m)))
 		val cs: List[Either[InterpretterError, Int]]    = evald.map{x => x.right.flatMap{y: Any => validateInt(y.toString)} }
 		val ints: Either[InterpretterError, List[Int]]  = f(cs)
@@ -153,9 +172,9 @@ object LispInterpretter {
 		}
 	}
 
-	private def handleDefine(v: String, exp: SExpr)(m: Map[String, Any]): Either[(InterpretterError, M), (Unit, M)] = 
+	private def handleDefine(v: String, exp: SExpr)(m: Map[String, Any]): Either[(InterpretterError, M), (DefineOp, M)] = 
 		evaluate(exp)(m) match {
-			case Right((result, m)) => Right((), m + (v -> result))
+			case Right((result, m)) => Right(Op, m + (v -> result))
 			case Left((err, _))     => Left((err, m))
 		}
 
@@ -175,5 +194,4 @@ object LispInterpretter {
 			case _: NumberFormatException => Left(NotAnInt(x))
 		}
 	}
-
 }

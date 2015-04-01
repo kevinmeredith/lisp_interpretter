@@ -1,5 +1,7 @@
 package net.common
 
+import net.parser.AST.SExpr
+
 object Error {
 
 	sealed trait LispError
@@ -15,7 +17,9 @@ object Error {
 	
 	sealed trait InvalidLambda     									 extends InterpretterError
 	case class WrongNumArgs(fields: List[String], values: List[Any]) extends InvalidLambda
-	case object BadLambda                                            extends InterpretterError
+	case class InvalidArgument(x: SExpr)						     extends InvalidLambda
+	case object DefineNotAllowed									 extends InvalidLambda
+	case object BadLambda                                            extends InvalidLambda
 
 	sealed trait MathError 		   extends InterpretterError
 	case class NotAnInt(x: String) extends MathError
