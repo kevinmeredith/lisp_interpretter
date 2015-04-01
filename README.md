@@ -57,6 +57,13 @@ Right((200,Map(x -> 100, y -> 100)))
 Left((ParseError(ParseError(Position(12,1,13), Position(12,1,13), <2 traces>)),Map(x -> 100, y -> 100)))
 ```
 
+## Testing
+
+There are two [Scalatest](http://www.scalatest.org/) tests:
+
+* net.parser.ParserTest
+* net.interpretter.LispInterpretterTest
+
 ## TODO
 
 * test `setenv! var value`
