@@ -8,7 +8,7 @@ simple [norvig.com-inspired](http://norvig.com/lispy.html) Lisp.
 It uses [parboiled2](parboiled2.org) for parsing. Upon a successful parse, an
 `net.parser.AST.SExpr` instance gets returned.
 
-Lastly, `net.interpretter.LispParser#evaluate`'s return type is `Either[(InterpretterError, M), (Any, M)]`.
+Lastly, `net.interpretter.LispParser#evaluate`'s return type is `com.parser.AST.EvalResult`.
 
 In short, the 
 
