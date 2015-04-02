@@ -2,7 +2,8 @@
 
 ## Overview
 
-This code implements a parser, interpretter, and REPL for a simple Lisp.
+This code implements a parser, interpretter, and REPL for a 
+simple [norvig.com-inspired](http://norvig.com/lispy.html) Lisp.
 
 It uses [parboiled2](parboiled2.org) for parsing. Upon a successful parse, an
 `net.parser.AST.SExpr` instance gets returned.
@@ -57,6 +58,28 @@ Right((200,Map(x -> 100, y -> 100)))
 Left((ParseError(ParseError(Position(12,1,13), Position(12,1,13), <2 traces>)),Map(x -> 100, y -> 100)))
 ```
 
+**lambda**
+
+*Note* - the lambda's values do not *have* to exist until execution time.
+
+```
+scala> net.repl.LispRepl.runForever(Map()).unsafePerformIO
+>(define f (lambda (x) (+ x x)))
+Complete(Right((Lambda,Map(f -> <function1>))))
+>(f 20)
+Complete(Right((40,Map(f -> <function1>))))
+>(define g (lambda (x) (+ x z)))
+Complete(Right((Lambda,Map(f -> <function1>, g -> <function1>))))
+>(g 30)
+Complete(Left((NoVarExists,Map(f -> <function1>, g -> <function1>))))
+>(set! z 300)
+Complete(Right(((),Map(f -> <function1>, g -> <function1>, z -> 300))))
+>(g 30)
+Complete(Right((330,Map(f -> <function1>, g -> <function1>, z -> 300))))
+>12341234
+Complete(Right((12341234,Map(f -> <function1>, g -> <function1>, z -> 300))))
+```
+
 ## Testing
 
 There are two [Scalatest](http://www.scalatest.org/) tests:
@@ -66,5 +89,4 @@ There are two [Scalatest](http://www.scalatest.org/) tests:
 
 ## TODO
 
-* add `lambda` 
 * show actual text when user types it in the REPL

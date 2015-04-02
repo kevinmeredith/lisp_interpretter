@@ -1,6 +1,7 @@
 package net.parser
 
 import scala.annotation.tailrec
+import net.common.Error._
 
 object AST {
 
@@ -19,11 +20,24 @@ object AST {
 
 	def printSExprs(xs: List[SExpr]): String = 
 		xs.foldLeft("") {
-				(acc: String, elem: SExpr) => {
-					acc match {
-						case "" => elem.toString
-						case _  => acc + " " + elem.toString
-					}
+			(acc: String, elem: SExpr) => {
+				acc match {
+					case "" => elem.toString
+					case _  => acc + " " + elem.toString
 				}
 			}
+		}
+
+	type M = Map[String, Any]
+
+	sealed trait EvalResult
+	case class Complete(res: Either[(LispError, M), (Any, M)]) extends EvalResult
+	case class Partial(res: List[Any] => M => EvalResult) extends EvalResult
+
+	implicit def eitherResultToComplete(x: Either[(LispError, M), (Any, M)]): EvalResult = 
+		Complete(x)
+
+	sealed trait DefineOp
+	case object Op extends DefineOp	
+	case object Lambda extends DefineOp
 }
