@@ -92,3 +92,4 @@ There are two [Scalatest](http://www.scalatest.org/) tests:
 * show actual text when user types it in the REPL
 * consider changing REPL map type from `Map[String, Any]` to `Map[String, EvalResult]`
    * that would prevent casting [here](https://github.com/kevinmeredith/lisp_interpretter/blob/master/src/main/scala/net/interpretter/LispInterpretter.scala#L191), I think
+* re-visit `EvalResult` as the return type - it's not a Monad
