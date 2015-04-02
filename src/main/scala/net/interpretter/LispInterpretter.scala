@@ -8,8 +8,6 @@ object LispInterpretter {
 
 	val plusZero: Either[InterpretterError, Any] = Right(0)
 
-	
-
 	def evaluate(e: SExpr)(map: M): EvalResult =
 		e match {
 			case Number(n) 					    => Right((n, map))
@@ -138,7 +136,7 @@ object LispInterpretter {
 	}
 
 	// TODO: DRY up - remove boilerplate from gtFn and eqFn
-	private def eqFn(es: List[SExpr], m: Map[String, Any]): Either[InterpretterError, Boolean] = {
+	private def eqFn(es: List[SExpr], m: M): Either[InterpretterError, Boolean] = {
 		val evald: List[EvalResult] 						  = es.map(evaluate(_)(m))
 		val resultsOnly: List[Either[InterpretterError, Any]] = evald.map(extractComplete)
 		val cs: List[Either[InterpretterError, Int]]    	  = resultsOnly.map{x => x.right.flatMap{y: Any => validateInt(y.toString)} }
@@ -165,7 +163,7 @@ object LispInterpretter {
 			}
 		}
 
-	private def getVar(v: String)(map: Map[String, Any]): EvalResult = 
+	private def getVar(v: String)(map: M): EvalResult = 
 		map.get(v) match {
 			case None    => Left((NoVarExists,map))
 			case Some(x) => Right((x, map))
@@ -173,7 +171,7 @@ object LispInterpretter {
 
 	private def stringLiteral(x: String) = x.startsWith("\"") && x.endsWith("\"")
 
-	private def handleProc(proc: String, es: List[SExpr], map: Map[String, Any]): EvalResult = {
+	private def handleProc(proc: String, es: List[SExpr], map: M): EvalResult = {
 		val evald: Either[InterpretterError, Any] = proc match {
 			case "+" => es.foldLeft(plusZero)(addFn(map))
 			case ">" => gtFn(es, map)
@@ -182,19 +180,37 @@ object LispInterpretter {
 		}
 
 		evald match {
-			case Right(x)  => Right((x, map))
+			case Right(x)        => Right((x, map))
+			case Left(ProcError) => checkForLambda(proc, es, map)
+			case Left(err) 		 => Left((err, map))
+		}
+	}
+
+	private def checkForLambda(proc: String, es: List[SExpr], map: M): EvalResult = {
+		println("map.get(proc): " + map.get(proc).foreach(_.getClass))
+		map.get(proc) match {
+			case Some(f: Function1[_, _]) => applyLambdaInputs(f.asInstanceOf[List[Any] => EvalResult], es, map) // TODO: asInstanceOf!
+			case _ 					      => Left((ProcError, map))
+		}
+	}
+
+	private def applyLambdaInputs(fn: (List[Any] => EvalResult), es: List[SExpr], map: M): EvalResult = {
+		val evald: List[EvalResult]                         = es.map(evaluate(_)(map))
+		val completes: List[Either[InterpretterError, Any]] = evald.map(extractComplete)
+		f(completes) match {
+			case Right(xs) => fn(xs)
 			case Left(err) => Left((err, map))
 		}
 	}
 
-	private def handleDefine(v: String, exp: SExpr)(m: Map[String, Any]): EvalResult = 
+	private def handleDefine(v: String, exp: SExpr)(m: M): EvalResult = 
 		evaluate(exp)(m) match {
 			case Complete(Right((result, m))) => Right(Op, m + (v -> result))
 			case Complete(Left((err, _)))     => Left((err, m))
 			case Partial(f)					  => Right((Lambda, m + (v -> f)))
 		}
 
-	private def handleIf(test: SExpr, conseq: SExpr, alt: SExpr)(map: Map[String, Any]): EvalResult = 
+	private def handleIf(test: SExpr, conseq: SExpr, alt: SExpr)(map: M): EvalResult = 
 		evaluate(test)(map) match {
 			case Complete(Right((true, m)))  => evaluate(conseq)(m)
 			case Complete(Right((false, m))) => evaluate(alt)(m)
