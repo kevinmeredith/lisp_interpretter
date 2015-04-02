@@ -1,6 +1,7 @@
 package net.parser
 
 import scala.annotation.tailrec
+import net.common.Error._
 
 object AST {
 
@@ -27,6 +28,16 @@ object AST {
 			}
 		}
 
+	type M = Map[String, Any]
+
+	sealed trait EvalResult
+	case class Complete(res: Either[(InterpretterError, M), (Any, M)]) extends EvalResult
+	case class Partial(res: List[Any] => EvalResult) extends EvalResult
+
+	implicit def eitherResultToComplete(x: Either[(InterpretterError, M), (Any, M)]): EvalResult = 
+		Complete(x)
+
 	sealed trait DefineOp
 	case object Op extends DefineOp	
+	case object Lambda extends DefineOp
 }

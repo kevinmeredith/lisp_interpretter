@@ -14,6 +14,7 @@ object Error {
 	case object ProcError		   extends InterpretterError
 	case object NoVarExists		   extends InterpretterError
 	case object SetError		   extends InterpretterError
+	case object LambdaNotAllowed   extends InterpretterError
 	
 	sealed trait InvalidLambda     									 extends InterpretterError
 	case class WrongNumArgs(fields: List[String], values: List[Any]) extends InvalidLambda

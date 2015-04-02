@@ -8,9 +8,9 @@ object LispInterpretter {
 
 	val plusZero: Either[InterpretterError, Any] = Right(0)
 
-	type M = Map[String, Any]
+	
 
-	def evaluate(e: SExpr)(map: M): Either[(InterpretterError, M), (Any, M)] =
+	def evaluate(e: SExpr)(map: M): EvalResult =
 		e match {
 			case Number(n) 					    => Right((n, map))
 			case Ident(s) if (stringLiteral(s)) => Right((s,map))
@@ -20,7 +20,7 @@ object LispInterpretter {
 				case Ident("quote") :: xs 						 => Right((xs.foldLeft("")(_ + _.toString)), map)
 				case Ident("define") :: Ident(v) :: exp :: Nil   => handleDefine(v, exp)(map)
 				case Ident("set!") :: Ident(v) :: xs 			 => handleSet(v, map, xs)
-				case Ident("lambda") :: xs 			             => handleLambda(xs, map)(_: List[Any])
+				case Ident("lambda") :: xs 			             => Partial( (inputs: List[Any]) => handleLambda(xs, map)(inputs) )
 				case Ident(proc) :: xs							 => handleProc(proc, xs, map) // TODO: update for lambda
 				case Nil										 => Left((EmptyExpression, map))
 				case _											 => Left((ProcError, map))
@@ -32,12 +32,12 @@ object LispInterpretter {
 //(lambda (r x) (* pi (* r x)))
 
 	// Using default inputs in the event that no `define` accompanies the `inputs`.
-	private def handleLambda(es: List[SExpr], map: M)(inputs: List[Any]): Either[(InterpretterError, M), (Any, M)] = es match {
+	private def handleLambda(es: List[SExpr], map: M)(inputs: List[Any]): EvalResult = es match {
 		case Comb(es) :: fn :: Nil => handleFunction(es, map, fn)(inputs)
 		case _ 				       => Left((BadLambda, map))
 	}
 
-	private def handleFunction(es: List[SExpr], map: M, fn: SExpr)(inputs: List[Any]): Either[(InterpretterError, M), (Any, M)] = {
+	private def handleFunction(es: List[SExpr], map: M, fn: SExpr)(inputs: List[Any]): EvalResult = {
 		val vars: Either[InvalidLambda, List[String]] = getVars(es)
 		vars match {
 			case Right(xs) => {
@@ -60,12 +60,16 @@ object LispInterpretter {
 		}
 	}
 
-	private def applyFn(map: M, fn: SExpr, locals: M): Either[(InterpretterError, M), (Any, M)] = for {
-		evald <- (evaluate(fn)(map ++ locals)).right // favor local variables over REPL globals
-		_ 	  <- excludeDefine(evald).right
-	} yield (evald._1, map) // return original map since 'lambda' may not alter 
+	private def applyFn(map: M, fn: SExpr, locals: M): EvalResult = {
+		evaluate(fn)(map ++ locals) match { // favor local variables over REPL globals
+			case Complete(Right((Op, _))) => Left((DefineNotAllowed, map))  // return original map since 'lambda' may not alter
+			case Complete(Right((x, _)))  => Right((x, map))  				// return original map since 'lambda' may not alter
+			case Complete(Left((err, _))) => Left((err, map))
+			case p @ Partial(_)           => p
+		}
+	}
 
-	private def excludeDefine(result: (Any, M)): Either[(InterpretterError, M), (Any, M)] = 
+	private def excludeDefine(result: (Any, M)): EvalResult = 
 		result match {
 			case ((Op, m)) => Left((DefineNotAllowed), m) 
 			case ((x, m))        => Right((x,m))
@@ -83,13 +87,14 @@ object LispInterpretter {
 		case _        => Left(BadLambda)
 	}
 
-	private def handleSet(v: String, map: M, es: List[SExpr]): Either[(InterpretterError, M), (Any, M)] = es match {
+	private def handleSet(v: String, map: M, es: List[SExpr]): EvalResult = es match {
 		case Ident(x) :: Nil    => Right(((),map + (v -> x)))
 		case Number(x) :: Nil   => Right(((), map + (v -> x)))
 		case (c @ Comb(_)) :: Nil => {
 			evaluate(c)(map) match {
-				case Right((x, m)) => Right(((), m + (v -> x)))
-				case Left((x, m))  => Left((x, m))
+				case Complete((Right((x, m)))) => Right(((), m + (v -> x)))
+				case Complete(Left((x, m)))    => Left((x, m))
+				case p @ Partial(_) 		   => p
 			}
 		}
 		case _ 				    => Left((SetError, map))
@@ -100,23 +105,32 @@ object LispInterpretter {
 	private def addFn(m: M): AddOp = {
 		(acc: Either[InterpretterError, Any], elem: SExpr) => {
 			evaluate(elem)(m) match {
-				case Right((x, _)) => for {
+				case Complete(Right((x, _))) => for {
 					a     <- acc.right
 					a_int <- validateInt(a.toString).right
 					i 	  <- validateInt(x.toString).right 
 				} yield a_int + i
-				case Left((x, _)) => Left(x)
+				case Complete(Left((x, _))) => Left(x)
+				case Partial(_) 			=> Left(LambdaNotAllowed)
 			} 
 		}
 	}
 
 	// Continuously decreasing (http://stackoverflow.com/q/29349946/409976)
 	private def gtFn(es: List[SExpr], m: M): Either[InterpretterError, Boolean] = {
-		val evald: List[Either[InterpretterError, Any]] = es.map(e => fst(evaluate(e)(m)))
-		val cs: List[Either[InterpretterError, Int]]    = evald.map{x => x.right.flatMap{y: Any => validateInt(y.toString)} }
+		val evald: List[EvalResult] = es.map(evaluate(_)(m))
+		val resultsOnly: List[Either[InterpretterError, Any]] = evald.map(extractComplete)
+		val cs: List[Either[InterpretterError, Int]]    = resultsOnly.map{x => x.right.flatMap{y: Any => validateInt(y.toString)} }
 		val ints: Either[InterpretterError, List[Int]]  = f(cs)
 		ints.right.map(decreasing(_)) 
 	}
+
+	private def extractComplete(result: EvalResult): Either[InterpretterError, Any] =	
+		result match {
+			case Complete(Right((x, _)))  => Right(x)
+			case Complete(Left((err, _))) => Left(err)
+			case Partial(_)               => Left(LambdaNotAllowed)
+		}
 
 	private def fst[A, B, C, D](xs: Either[(A, B), (C, D)]): Either[A, C] = xs match {
 		case Right((x, y)) => Right(x)
@@ -125,9 +139,10 @@ object LispInterpretter {
 
 	// TODO: DRY up - remove boilerplate from gtFn and eqFn
 	private def eqFn(es: List[SExpr], m: Map[String, Any]): Either[InterpretterError, Boolean] = {
-		val evald: List[Either[InterpretterError, Any]] = es.map(e => fst(evaluate(e)(m)))
-		val cs: List[Either[InterpretterError, Int]]    = evald.map{x => x.right.flatMap{y: Any => validateInt(y.toString)} }
-		val ints: Either[InterpretterError, List[Int]]  = f(cs)
+		val evald: List[EvalResult] 						  = es.map(evaluate(_)(m))
+		val resultsOnly: List[Either[InterpretterError, Any]] = evald.map(extractComplete)
+		val cs: List[Either[InterpretterError, Int]]    	  = resultsOnly.map{x => x.right.flatMap{y: Any => validateInt(y.toString)} }
+		val ints: Either[InterpretterError, List[Int]]  	  = f(cs)
 		ints.right.map(allEquals(_)) 
 	}
 
@@ -150,7 +165,7 @@ object LispInterpretter {
 			}
 		}
 
-	private def getVar(v: String)(map: Map[String, Any]): Either[(InterpretterError, M), (Any, M)] = 
+	private def getVar(v: String)(map: Map[String, Any]): EvalResult = 
 		map.get(v) match {
 			case None    => Left((NoVarExists,map))
 			case Some(x) => Right((x, map))
@@ -158,7 +173,7 @@ object LispInterpretter {
 
 	private def stringLiteral(x: String) = x.startsWith("\"") && x.endsWith("\"")
 
-	private def handleProc(proc: String, es: List[SExpr], map: Map[String, Any]): Either[(InterpretterError, M), (Any, M)] = {
+	private def handleProc(proc: String, es: List[SExpr], map: Map[String, Any]): EvalResult = {
 		val evald: Either[InterpretterError, Any] = proc match {
 			case "+" => es.foldLeft(plusZero)(addFn(map))
 			case ">" => gtFn(es, map)
@@ -172,17 +187,18 @@ object LispInterpretter {
 		}
 	}
 
-	private def handleDefine(v: String, exp: SExpr)(m: Map[String, Any]): Either[(InterpretterError, M), (DefineOp, M)] = 
+	private def handleDefine(v: String, exp: SExpr)(m: Map[String, Any]): EvalResult = 
 		evaluate(exp)(m) match {
-			case Right((result, m)) => Right(Op, m + (v -> result))
-			case Left((err, _))     => Left((err, m))
+			case Complete(Right((result, m))) => Right(Op, m + (v -> result))
+			case Complete(Left((err, _)))     => Left((err, m))
+			case Partial(f)					  => Right((Lambda, m + (v -> f)))
 		}
 
-	private def handleIf(test: SExpr, conseq: SExpr, alt: SExpr)(map: Map[String, Any]): Either[(InterpretterError, M), (Any, M)] = 
+	private def handleIf(test: SExpr, conseq: SExpr, alt: SExpr)(map: Map[String, Any]): EvalResult = 
 		evaluate(test)(map) match {
-			case Right((true, m))  => evaluate(conseq)(m)
-			case Right((false, m)) => evaluate(alt)(m)
-			case _			       => Left((BadIfError), map)
+			case Complete(Right((true, m)))  => evaluate(conseq)(m)
+			case Complete(Right((false, m))) => evaluate(alt)(m)
+			case _			       			 => Left( (BadIfError, map) )
 		}
 
 

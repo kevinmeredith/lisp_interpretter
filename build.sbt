@@ -12,6 +12,8 @@ libraryDependencies += "org.scalaz" %% "scalaz-effect" % "7.1.1"
 
 libraryDependencies += "org.scalatest" % "scalatest_2.11" % "2.2.1" % "test"
 
+scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature")
+
 // Fork JVM when `run`-ing SBT
 // http://stackoverflow.com/a/5265162/409976
 fork in run := true

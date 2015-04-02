@@ -6,7 +6,6 @@ import net.parser.AST._
 import net.interpretter.LispInterpretter._
 import net.common.Error._
 import net.repl.LispRepl.getMap
-import net.interpretter.LispInterpretter.M
 import scala.util.{Try, Success, Failure}
 
 class LispInterpretterTest extends FlatSpec {
@@ -68,7 +67,7 @@ class LispInterpretterTest extends FlatSpec {
 	"The Lisp Interpretter" should "return a ProcError for a parenthesized Number" in {
 		val parsed = new LispParser("((((1234))))").SExprComplete.run()
 		parsed.foreach({ x =>
-			assert( LispInterpretter.evaluate(x)(empty) == Left((ProcError, Map())) )
+			assert( LispInterpretter.evaluate(x)(empty) == Complete(Left((ProcError, Map())) ))
 		})
 	}			
 
