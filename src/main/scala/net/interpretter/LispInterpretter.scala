@@ -10,24 +10,20 @@ object LispInterpretter {
 
 	def evaluate(e: SExpr)(map: M): EvalResult =
 		e match {
-			case Number(n) 					    => Right((n, map))
-			case Ident(s) if (stringLiteral(s)) => Right((s,map))
+			case Number(n) 					    => Right((Val(n), map))
+			case Ident(s) if (stringLiteral(s)) => Right((Val(s),map))
 			case Ident(s)  					    => getVar(s)(map)
 			case Comb(es)  					    => es match {
 				case Ident("if") :: test :: conseq :: alt :: Nil => handleIf(test, conseq, alt)(map)
-				case Ident("quote") :: xs 						 => Right((xs.foldLeft("")(_ + _.toString)), map)
+				case Ident("quote") :: xs 						 => Right((Val(xs.foldLeft("")(_ + _.toString)), map))
 				case Ident("define") :: Ident(v) :: exp :: Nil   => handleDefine(v, exp)(map)
 				case Ident("set!") :: Ident(v) :: xs 			 => handleSet(v, map, xs)
-				case Ident("lambda") :: xs 			             => Partial( (inputs: List[Any]) => (map: M) => handleLambda(xs)(map)(inputs) )
+				case Ident("lambda") :: xs 			             => Partial{(inputs: List[Any], map: M) => handleLambda(xs)(map)(inputs) }
 				case Ident(proc) :: xs							 => handleProc(proc, xs, map) // TODO: update for lambda
 				case Nil										 => Left((EmptyExpression, map))
 				case _											 => Left((ProcError, map))
 			}
 		}
-
-// examples:
-//(lambda (r) (* pi (* r r)))
-//(lambda (r x) (* pi (* r x)))
 
 	// Using default inputs in the event that no `define` accompanies the `inputs`.
 	private def handleLambda(es: List[SExpr])(map: M)(inputs: List[Any]): EvalResult = es match {
@@ -39,7 +35,7 @@ object LispInterpretter {
 		val vars: Either[InvalidLambda, List[String]] = getVars(es)
 		vars match {
 			case Right(xs) => {
-				val locals: Either[InvalidLambda, M] = getAppliedValues(xs)(inputs)
+				val locals: Either[InvalidLambda, M] = getAppliedValues(xs)(inputs) // assume that Partial's are prevented by Parser?
 				locals match {
 					case Right(lcls) => applyFn(map, fn, lcls)
 					case Left(x)     => Left((x, map))
@@ -51,7 +47,7 @@ object LispInterpretter {
 
 	private def getAppliedValues(vars: List[String])(inputs: List[Any]): Either[InvalidLambda, M] = {
 		if(vars.length == inputs.length) {
-			Right(vars.zip(inputs).toMap)
+			Right(vars.zip(inputs.map(Val(_))).toMap)
 		}
 		else {
 			Left(WrongNumArgs(vars, inputs))
@@ -60,17 +56,16 @@ object LispInterpretter {
 
 	private def applyFn(map: M, fn: SExpr, locals: M): EvalResult = {
 		evaluate(fn)(map ++ locals) match { // favor local variables over REPL globals
-			case Complete(Right((Op, _))) => Left((DefineNotAllowed, map))  // return original map since 'lambda' may not alter
-			case Complete(Right((x, _)))  => Right((x, map))  				// return original map since 'lambda' may not alter
-			case Complete(Left((err, _))) => Left((err, map))
-			case p @ Partial(_)           => p
+			case Complete(Right((Val(Op), _)))   => Left((DefineNotAllowed, map))  // return original map since 'lambda' may not update the REPL/global map
+			case Complete(Right((x, _)))   		 => Right((x, map))  		      // return original map since 'lambda' may not update the REPL/global map
+			case Complete(Left((err, _)))    	 => Left((err, map))
 		}
 	}
 
 	private def excludeDefine(result: (Any, M)): EvalResult = 
 		result match {
-			case ((Op, m)) => Left((DefineNotAllowed), m) 
-			case ((x, m))        => Right((x,m))
+			case ((Op, m)) => Left((DefineNotAllowed, m))
+			case ((x, m))  => Right((Val(x),m))
 		}
 
 	val initial: Either[InvalidLambda, List[String]] = Right(Nil)
@@ -86,13 +81,13 @@ object LispInterpretter {
 	}
 
 	private def handleSet(v: String, map: M, es: List[SExpr]): EvalResult = es match {
-		case Ident(x) :: Nil    => Right(((),map + (v -> x)))
-		case Number(x) :: Nil   => Right(((), map + (v -> x)))
+		case Ident(x) :: Nil    => Right((Val(SetOp(v, x)),map + (v -> Val(x))))
+		case Number(x) :: Nil   => Right((Val(SetOp(v, x)), map + (v -> Val(x))))
 		case (c @ Comb(_)) :: Nil => {
 			evaluate(c)(map) match {
-				case Complete((Right((x, m)))) => Right(((), m + (v -> x)))
-				case Complete(Left((x, m)))    => Left((x, m))
-				case p @ Partial(_) 		   => p
+				case Complete((Right((Val(x), m)))) => Right((Val(SetOp(v, x)), m + (v -> Val(x))))
+				case Complete(Left((x, m)))         => Left((x, m))
+				case Complete((Right(((f @ Fn(_)), _))))  => Right((Val(Lambda), map + (v -> f)))
 			}
 		}
 		case _ 				    => Left((SetError, map))
@@ -102,14 +97,16 @@ object LispInterpretter {
 
 	private def addFn(m: M): AddOp = {
 		(acc: Either[LispError, Any], elem: SExpr) => {
+			val result = evaluate(elem)(m)
+			println(result)
 			evaluate(elem)(m) match {
-				case Complete(Right((x, _))) => for {
+				case Complete(Right((Val(x), _))) => for {
 					a     <- acc.right
 					a_int <- validateInt(a.toString).right
 					i 	  <- validateInt(x.toString).right 
 				} yield a_int + i
 				case Complete(Left((x, _))) => Left(x)
-				case Partial(_) 			=> Left(LambdaNotAllowed)
+				case _ 			            => Left(LambdaNotAllowed)
 			} 
 		}
 	}
@@ -125,9 +122,9 @@ object LispInterpretter {
 
 	private def extractComplete(result: EvalResult): Either[LispError, Any] =	
 		result match {
-			case Complete(Right((x, _)))  => Right(x)
-			case Complete(Left((err, _))) => Left(err)
-			case Partial(_)               => Left(LambdaNotAllowed)
+			case Complete(Right((x, _)))     => Right(x)
+			case Complete(Left((err, _)))    => Left(err)
+			case Complete(Right((Fn(_), _))) => Left(LambdaNotAllowed)
 		}
 
 	private def fst[A, B, C, D](xs: Either[(A, B), (C, D)]): Either[A, C] = xs match {
@@ -180,7 +177,7 @@ object LispInterpretter {
 		}
 
 		evald match {
-			case Right(x)        => Right((x, map))
+			case Right(x)        => Right((Val(x), map))
 			case Left(ProcError) => checkForLambda(proc, es, map)
 			case Left(err) 		 => Left((err, map))
 		}
@@ -188,32 +185,32 @@ object LispInterpretter {
 
 	private def checkForLambda(proc: String, es: List[SExpr], map: M): EvalResult = {
 		map.get(proc) match {
-			case Some(f: Function1[_, _]) => applyLambdaInputs(f.asInstanceOf[List[Any] => M => EvalResult], es, map) // TODO: asInstanceOf!
-			case _ 					         => Left((ProcError, map))
+			case Some(Fn(f)) => applyLambdaInputs(f, es, map) // TODO: asInstanceOf!
+			case _ 			 => Left((ProcError, map))
 		}
 	}
 
-	private def applyLambdaInputs(fn: (List[Any] => M => EvalResult), es: List[SExpr], map: M): EvalResult = {
+	private def applyLambdaInputs(fn: Function2[List[Any], M, EvalResult], es: List[SExpr], map: M): EvalResult = {
 		val evald: List[EvalResult]                 = es.map(evaluate(_)(map))
 		val completes: List[Either[LispError, Any]] = evald.map(extractComplete)
 		f(completes) match {
-			case Right(xs) => fn(xs)(map)
+			case Right(xs) => fn(xs, map)
 			case Left(err) => Left((err, map))
 		}
 	}
 
 	private def handleDefine(v: String, exp: SExpr)(m: M): EvalResult = 
 		evaluate(exp)(m) match {
-			case Complete(Right((result, m))) => Right(Op, m + (v -> result))
-			case Complete(Left((err, _)))     => Left((err, m))
-			case Partial(f)					  => Right((Lambda, m + (v -> f)))
+			case Complete(Right((result, m)))     => Right(Val(Op), m + (v -> Val(result)))
+			case Complete(Left((err, _)))         => Left((err, m))
+			case Complete(Right((f @ Fn(_), _)))  => Right((Val(Lambda), m + (v -> f)))
 		}
 
 	private def handleIf(test: SExpr, conseq: SExpr, alt: SExpr)(map: M): EvalResult = 
 		evaluate(test)(map) match {
-			case Complete(Right((true, m)))  => evaluate(conseq)(m)
-			case Complete(Right((false, m))) => evaluate(alt)(m)
-			case _			       			 => Left( (BadIfError, map) )
+			case Complete(Right((Val(true), m)))  => evaluate(conseq)(m)
+			case Complete(Right((Val(false), m))) => evaluate(alt)(m)
+			case _			       			      => Left( (BadIfError, map) )
 		}
 
 
