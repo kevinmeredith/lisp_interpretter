@@ -151,7 +151,7 @@ class LispInterpretterTest extends FlatSpec {
 		val evald: EvalResult = LispInterpretter.evaluate(parsed.get)(empty)
 		val newMap: M         = evald match { case Complete(Right((_, m))) => m }
 		val parsed2           = new LispParser("(f 10)").SExprComplete.run()
-		testSuccessfulEval(parsed2, Complete(Right((20,Map()))), newMap)
+		testSuccessfulEval(parsed2, Complete(Right((20,newMap))), newMap)
 	}		
 
 	"The Lisp Interpretter" should "succeed for define-ing 2 lambas, and then adding them." in {

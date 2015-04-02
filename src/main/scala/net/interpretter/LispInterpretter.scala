@@ -6,7 +6,7 @@ object LispInterpretter {
 	
 	import net.common.Error._
 
-	val plusZero: Either[InterpretterError, Any] = Right(0)
+	val plusZero: Either[LispError, Any] = Right(0)
 
 	def evaluate(e: SExpr)(map: M): EvalResult =
 		e match {
@@ -18,7 +18,7 @@ object LispInterpretter {
 				case Ident("quote") :: xs 						 => Right((xs.foldLeft("")(_ + _.toString)), map)
 				case Ident("define") :: Ident(v) :: exp :: Nil   => handleDefine(v, exp)(map)
 				case Ident("set!") :: Ident(v) :: xs 			 => handleSet(v, map, xs)
-				case Ident("lambda") :: xs 			             => Partial( (inputs: List[Any]) => handleLambda(xs, map)(inputs) )
+				case Ident("lambda") :: xs 			             => Partial( (inputs: List[Any]) => (map: M) => handleLambda(xs)(map)(inputs) )
 				case Ident(proc) :: xs							 => handleProc(proc, xs, map) // TODO: update for lambda
 				case Nil										 => Left((EmptyExpression, map))
 				case _											 => Left((ProcError, map))
@@ -30,7 +30,7 @@ object LispInterpretter {
 //(lambda (r x) (* pi (* r x)))
 
 	// Using default inputs in the event that no `define` accompanies the `inputs`.
-	private def handleLambda(es: List[SExpr], map: M)(inputs: List[Any]): EvalResult = es match {
+	private def handleLambda(es: List[SExpr])(map: M)(inputs: List[Any]): EvalResult = es match {
 		case Comb(es) :: fn :: Nil => handleFunction(es, map, fn)(inputs)
 		case _ 				       => Left((BadLambda, map))
 	}
@@ -98,10 +98,10 @@ object LispInterpretter {
 		case _ 				    => Left((SetError, map))
 	}
 
-	type AddOp = Function2[Either[InterpretterError, Any], SExpr, Either[InterpretterError, Any]]		
+	type AddOp = Function2[Either[LispError, Any], SExpr, Either[LispError, Any]]		
 
 	private def addFn(m: M): AddOp = {
-		(acc: Either[InterpretterError, Any], elem: SExpr) => {
+		(acc: Either[LispError, Any], elem: SExpr) => {
 			evaluate(elem)(m) match {
 				case Complete(Right((x, _))) => for {
 					a     <- acc.right
@@ -115,15 +115,15 @@ object LispInterpretter {
 	}
 
 	// Continuously decreasing (http://stackoverflow.com/q/29349946/409976)
-	private def gtFn(es: List[SExpr], m: M): Either[InterpretterError, Boolean] = {
+	private def gtFn(es: List[SExpr], m: M): Either[LispError, Boolean] = {
 		val evald: List[EvalResult] = es.map(evaluate(_)(m))
-		val resultsOnly: List[Either[InterpretterError, Any]] = evald.map(extractComplete)
-		val cs: List[Either[InterpretterError, Int]]    = resultsOnly.map{x => x.right.flatMap{y: Any => validateInt(y.toString)} }
-		val ints: Either[InterpretterError, List[Int]]  = f(cs)
+		val resultsOnly: List[Either[LispError, Any]] = evald.map(extractComplete)
+		val cs: List[Either[LispError, Int]]    = resultsOnly.map{x => x.right.flatMap{y: Any => validateInt(y.toString)} }
+		val ints: Either[LispError, List[Int]]  = f(cs)
 		ints.right.map(decreasing(_)) 
 	}
 
-	private def extractComplete(result: EvalResult): Either[InterpretterError, Any] =	
+	private def extractComplete(result: EvalResult): Either[LispError, Any] =	
 		result match {
 			case Complete(Right((x, _)))  => Right(x)
 			case Complete(Left((err, _))) => Left(err)
@@ -136,11 +136,11 @@ object LispInterpretter {
 	}
 
 	// TODO: DRY up - remove boilerplate from gtFn and eqFn
-	private def eqFn(es: List[SExpr], m: M): Either[InterpretterError, Boolean] = {
-		val evald: List[EvalResult] 						  = es.map(evaluate(_)(m))
-		val resultsOnly: List[Either[InterpretterError, Any]] = evald.map(extractComplete)
-		val cs: List[Either[InterpretterError, Int]]    	  = resultsOnly.map{x => x.right.flatMap{y: Any => validateInt(y.toString)} }
-		val ints: Either[InterpretterError, List[Int]]  	  = f(cs)
+	private def eqFn(es: List[SExpr], m: M): Either[LispError, Boolean] = {
+		val evald: List[EvalResult] 				  = es.map(evaluate(_)(m))
+		val resultsOnly: List[Either[LispError, Any]] = evald.map(extractComplete)
+		val cs: List[Either[LispError, Int]]    	  = resultsOnly.map{x => x.right.flatMap{y: Any => validateInt(y.toString)} }
+		val ints: Either[LispError, List[Int]]  	  = f(cs)
 		ints.right.map(allEquals(_)) 
 	}
 
@@ -172,7 +172,7 @@ object LispInterpretter {
 	private def stringLiteral(x: String) = x.startsWith("\"") && x.endsWith("\"")
 
 	private def handleProc(proc: String, es: List[SExpr], map: M): EvalResult = {
-		val evald: Either[InterpretterError, Any] = proc match {
+		val evald: Either[LispError, Any] = proc match {
 			case "+" => es.foldLeft(plusZero)(addFn(map))
 			case ">" => gtFn(es, map)
 			case "=" => eqFn(es, map)
@@ -187,18 +187,17 @@ object LispInterpretter {
 	}
 
 	private def checkForLambda(proc: String, es: List[SExpr], map: M): EvalResult = {
-		println("map.get(proc): " + map.get(proc).foreach(_.getClass))
 		map.get(proc) match {
-			case Some(f: Function1[_, _]) => applyLambdaInputs(f.asInstanceOf[List[Any] => EvalResult], es, map) // TODO: asInstanceOf!
-			case _ 					      => Left((ProcError, map))
+			case Some(f: Function1[_, _]) => applyLambdaInputs(f.asInstanceOf[List[Any] => M => EvalResult], es, map) // TODO: asInstanceOf!
+			case _ 					         => Left((ProcError, map))
 		}
 	}
 
-	private def applyLambdaInputs(fn: (List[Any] => EvalResult), es: List[SExpr], map: M): EvalResult = {
-		val evald: List[EvalResult]                         = es.map(evaluate(_)(map))
-		val completes: List[Either[InterpretterError, Any]] = evald.map(extractComplete)
+	private def applyLambdaInputs(fn: (List[Any] => M => EvalResult), es: List[SExpr], map: M): EvalResult = {
+		val evald: List[EvalResult]                 = es.map(evaluate(_)(map))
+		val completes: List[Either[LispError, Any]] = evald.map(extractComplete)
 		f(completes) match {
-			case Right(xs) => fn(xs)
+			case Right(xs) => fn(xs)(map)
 			case Left(err) => Left((err, map))
 		}
 	}

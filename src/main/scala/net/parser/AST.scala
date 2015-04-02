@@ -31,10 +31,10 @@ object AST {
 	type M = Map[String, Any]
 
 	sealed trait EvalResult
-	case class Complete(res: Either[(InterpretterError, M), (Any, M)]) extends EvalResult
-	case class Partial(res: List[Any] => EvalResult) extends EvalResult
+	case class Complete(res: Either[(LispError, M), (Any, M)]) extends EvalResult
+	case class Partial(res: List[Any] => M => EvalResult) extends EvalResult
 
-	implicit def eitherResultToComplete(x: Either[(InterpretterError, M), (Any, M)]): EvalResult = 
+	implicit def eitherResultToComplete(x: Either[(LispError, M), (Any, M)]): EvalResult = 
 		Complete(x)
 
 	sealed trait DefineOp
