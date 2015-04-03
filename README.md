@@ -93,3 +93,58 @@ There are two [Scalatest](http://www.scalatest.org/) tests:
 * consider changing REPL map type from `Map[String, Any]` to `Map[String, EvalResult]`
    * that would prevent casting [here](https://github.com/kevinmeredith/lisp_interpretter/blob/master/src/main/scala/net/interpretter/LispInterpretter.scala#L191), I think
 * re-visit `EvalResult` as the return type - it's not a Monad
+
+### Making Stronger Type Thoughts:
+
+```
+scala> sealed trait Foo
+defined trait Foo
+
+scala> case class Fip(fn: Function1[Int, Int]) extends Foo
+defined class Fip
+
+scala> Fip(_ * 2)
+res0: Fip = Fip(<function1>)
+
+scala> val f: Foo = Fip(_ + 1)
+f: Foo = Fip(<function1>)
+
+scala> def applyFn(f: Foo): Int = f match {
+     |   case Fip(g) => g(10)
+     | }
+applyFn: (f: Foo)Int
+
+scala> applyFn(Fip(_ * 2))
+res1: Int = 20
+
+scala> def applyFn2(f: Foo): Int = f match {
+     |   case Fip(g) => g("fo")
+     | }
+<console>:12: error: type mismatch;
+ found   : String("fo")
+ required: Int
+         case Fip(g) => g("fo")
+                          ^
+```
+
+for `Function2`:
+
+```
+
+scala> sealed trait Zig
+defined trait Zig
+
+scala> case class Zag(fn: Function2[Int, Int, Int]) extends Zig
+defined class Zag
+
+scala> Zag(_ + _)
+res2: Zag = Zag(<function2>)
+
+scala> def ap(z: Zig): Int = z match {
+     |  case Zag(f) => f(10, 20)
+     | }
+ap: (z: Zig)Int
+
+scala> ap(res2)
+res3: Int = 30
+```

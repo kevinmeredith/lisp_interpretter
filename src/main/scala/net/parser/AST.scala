@@ -12,7 +12,7 @@ object AST {
 	}
 
 	case class Number(x: Int) extends Atom {
-		override def toString = x.toString
+		override def toString = x.toString // TODO: use `show`
 	}
 	case class Ident(x: String) extends Atom {
 		override def toString = x
@@ -28,16 +28,24 @@ object AST {
 			}
 		}
 
-	type M = Map[String, Any]
+	sealed trait MValue
+	sealed trait SingleValue extends MValue
+	case class Val(x: Any) extends SingleValue
+	case class Fn(f: Function2[List[Any], M, EvalResult]) extends MValue
+
+	type M = Map[String, MValue]
 
 	sealed trait EvalResult
-	case class Complete(res: Either[(LispError, M), (Any, M)]) extends EvalResult
-	case class Partial(res: List[Any] => M => EvalResult) extends EvalResult
+	case class Complete(res: Either[(LispError, M), (SingleValue, M)]) extends EvalResult
+	case class Partial(f: Function2[List[Any], M, EvalResult]) extends EvalResult
 
-	implicit def eitherResultToComplete(x: Either[(LispError, M), (Any, M)]): EvalResult = 
+	implicit def eitherResultToComplete(x: Either[(LispError, M), (SingleValue, M)]): EvalResult = 
 		Complete(x)
 
-	sealed trait DefineOp
+	sealed trait MapUpdateOp 
+	case class SetOp(v: String, value: Any) extends MapUpdateOp
+
+	sealed trait DefineOp extends MapUpdateOp
 	case object Op extends DefineOp	
 	case object Lambda extends DefineOp
 }
