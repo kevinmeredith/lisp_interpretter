@@ -222,6 +222,17 @@ class LispInterpretterTest extends FlatSpec {
 		testSuccessfulEval(parsed3, Complete(Right((Val(66),finalMap))), mapWithBoth)
 	}
 
+	"The Lisp Interpretter" should "succeed for when applying a value to a lambda" in {
+		val parsed = new LispParser("((lambda (x) (+ 33)) 10)").SExprComplete.run()
+		testSuccessfulEval(parsed, Complete(Right((Val(33), empty))), empty)
+	}
+
+	"The Lisp Interpretter" should "succeed for when applying two values to a lambda" in {
+		val parsed = new LispParser("((lambda (x y) (+ 33 x y)) 10 20)").SExprComplete.run()
+		testSuccessfulEval(parsed, Complete(Right((Val(63), empty))), empty)
+	}	
+
+
 	def testSuccessfulEval(parsed: Try[SExpr], 
 						   expected: EvalResult, 
 						   map: M): Unit = parsed match {

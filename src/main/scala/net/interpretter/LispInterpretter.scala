@@ -19,6 +19,7 @@ object LispInterpretter {
 				case Ident("lambda") :: xs 			             => Partial{(inputs: List[Any], map: M) => handleLambda(xs)(map)(inputs) }
 				case Ident(proc) :: xs							 => handleProc(proc, xs, map) // TODO: update for lambda
 				case Nil										 => Left((EmptyExpression, map))
+				case Comb(Ident("lambda") :: xs) :: inputs       => handleLambda(xs)(map)(inputs)
 				case _											 => Left((ProcError, map))
 			}
 		}
@@ -175,6 +176,7 @@ object LispInterpretter {
 	}
 
 	private def checkForLambda(proc: String, es: List[SExpr], map: M): EvalResult = {
+		println("checkForLambda | proc: " + proc)
 		map.get(proc) match {
 			case Some(Fn(f)) => applyLambdaInputs(f, es, map) // TODO: asInstanceOf!
 			case _ 			 => Left((ProcError, map))
