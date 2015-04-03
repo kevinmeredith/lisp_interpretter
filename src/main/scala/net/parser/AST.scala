@@ -29,16 +29,17 @@ object AST {
 		}
 
 	sealed trait MValue
-	case class Val(x: Any) extends MValue
+	sealed trait SingleValue extends MValue
+	case class Val(x: Any) extends SingleValue
 	case class Fn(f: Function2[List[Any], M, EvalResult]) extends MValue
 
 	type M = Map[String, MValue]
 
 	sealed trait EvalResult
-	case class Complete(res: Either[(LispError, M), (MValue, M)]) extends EvalResult
+	case class Complete(res: Either[(LispError, M), (SingleValue, M)]) extends EvalResult
 	case class Partial(f: Function2[List[Any], M, EvalResult]) extends EvalResult
 
-	implicit def eitherResultToComplete(x: Either[(LispError, M), (MValue, M)]): EvalResult = 
+	implicit def eitherResultToComplete(x: Either[(LispError, M), (SingleValue, M)]): EvalResult = 
 		Complete(x)
 
 	sealed trait MapUpdateOp 

@@ -12,6 +12,8 @@ class LispInterpretterTest extends FlatSpec {
 	
 	val empty: M = Map()
 
+	implicit def anyToSingleValue(x: Any): SingleValue = Val(x)
+
 	"The Lisp Interpretter" should "return the number itself for a Number" in {
 		val parsed = new LispParser("5").SExprComplete.run()
 		testSuccessfulEval(parsed, Complete(Right((5, empty))), empty)
@@ -127,20 +129,20 @@ class LispInterpretterTest extends FlatSpec {
 	"The Lisp Interpretter" should "succeed for a valid 'set!' statement expression + expression using it" in {
 		val parsed = new LispParser("(set! x 100)").SExprComplete.run()
 		val parsed2 = new LispParser("x").SExprComplete.run()
-		testSuccessfulEval(parsed, Complete(Right((), Map("x" -> Val(100)))), empty)
+		testSuccessfulEval(parsed, Complete(Right((Val(SetOp("x",100)),Map("x" -> Val(100))))), empty) 
 		testSuccessfulEval(parsed2, Complete(Right((Val(100), Map("x" -> Val(100))))), Map("x" -> Val(100)))
 	}	
 
 	"The Lisp Interpretter" should "succeed for a valid 'set!' statement expression + expression using it #2" in {
 		val parsed = new LispParser("(set! x 100)").SExprComplete.run()
 		val parsed2 = new LispParser("(+ x 2)").SExprComplete.run()
-		testSuccessfulEval(parsed, Complete(Right((), Map("x" -> Val(100)))), empty)
+		testSuccessfulEval(parsed, Complete(Right(SetOp("x",100), Map("x" -> Val(100)))), empty)
 		testSuccessfulEval(parsed2, Complete(Right((Val(102), Map("x" -> Val(100))))), Map("x" -> Val(100)))
 	}		
 
 	"The Lisp Interpretter" should "succeed for a valid 'set!' SExpression that has multiple parentheses" in {
 		val parsed = new LispParser("(set! x (+ (+ 0 100) 1 2))").SExprComplete.run()
-		testSuccessfulEval(parsed, Complete(Right(((),Map("x" -> Val(103))))), empty)
+		testSuccessfulEval(parsed, Complete(Right((SetOp("x",103),Map("x" -> Val(103))))), empty)
 	}			
 
 	"The Lisp Interpretter" should "fail for an invalid 'set!' SExpression that has multiple parentheses" in {
@@ -189,7 +191,7 @@ class LispInterpretterTest extends FlatSpec {
 		testSuccessfulEval(addLambdas, Complete(Right((Val(false),mapWithBoth))), mapWithBoth)
 	}	
 
-	"The Lisp Interpretter" should "succeed for define-ing 2 lambas, and then comparing them for equality #2" in {
+	"The Lisp Interpretter" should "succeed for define-ing 2 lambdas, and then comparing them for equality #2" in {
 		val parsed             = new LispParser("(define f (lambda (x) (+ x x)))").SExprComplete.run()
 		val evald: EvalResult  = LispInterpretter.evaluate(parsed.get)(empty)
 		val mapWithF: M        = evald match { case Complete(Right((_, m))) => m }
@@ -204,6 +206,21 @@ class LispInterpretterTest extends FlatSpec {
 		testSuccessfulEval(addLambdas, Complete(Right((true,mapWithBoth))), mapWithBoth)
 	}		
 
+	"The Lisp Interpretter" should "succeed for defining a lambda equal to another lambda, and then invoking it" in {
+		val parsed             = new LispParser("(define f (lambda (x) (+ x x)))").SExprComplete.run()
+		val evald: EvalResult  = LispInterpretter.evaluate(parsed.get)(empty)	
+		val mapWithF: M        = evald match { case Complete(Right((_, m))) => m }
+
+		val parsed2             = new LispParser("(define g f)").SExprComplete.run()
+		val evald2: EvalResult  = LispInterpretter.evaluate(parsed2.get)(mapWithF)	
+		val mapWithBoth: M      = evald2 match { case Complete(Right((_, m))) => m }
+
+		val parsed3             = new LispParser("(g 33)").SExprComplete.run()
+		val invoked: EvalResult = LispInterpretter.evaluate(parsed3.get)(mapWithBoth)	
+		val finalMap: M         = invoked match { case Complete(Right((_, m))) => m }
+
+		testSuccessfulEval(parsed3, Complete(Right((Val(66),finalMap))), mapWithBoth)
+	}
 
 	def testSuccessfulEval(parsed: Try[SExpr], 
 						   expected: EvalResult, 
