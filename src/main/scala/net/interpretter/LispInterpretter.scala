@@ -123,7 +123,6 @@ object LispInterpretter {
 		case Left((x, y))  => Left(x)
 	}
 
-	// TODO: DRY up - remove boilerplate from gtFn and eqFn
 	private def eqFn(es: List[SExpr], m: M): Either[LispError, Boolean] = {
 		val ints: Either[LispError, List[Int]] = getInts(es, m)
 		ints.right.map(allEquals(_)) 
@@ -176,7 +175,7 @@ object LispInterpretter {
 	private def checkForLambda(proc: String, es: List[SExpr], map: M): EvalResult = {
 		println("checkForLambda | proc: " + proc)
 		map.get(proc) match {
-			case Some(Fn(f)) => applyLambdaInputs(f, es, map) // TODO: asInstanceOf!
+			case Some(Fn(f)) => applyLambdaInputs(f, es, map) 
 			case _ 			 => Left((ProcError, map))
 		}
 	}
