@@ -94,19 +94,20 @@ object LispInterpretter {
 	}
 
 	private def add(es: List[SExpr], m: M): Either[LispError, Int] = {
+		val ints: Either[LispError, List[Int]] = getInts(es, m)
+		ints.right.map(_.sum)
+	}
+
+	private def getInts(es: List[SExpr], m: M): Either[LispError, List[Int]] = {
 		val evald: List[EvalResult] 						  = es.map(evaluate(_)(m))
 		val resultsOnly: List[Either[LispError, SingleValue]] = evald.map(extractComplete)
 		val cs: List[Either[LispError, Int]]    			  = resultsOnly.map{x => x.right.flatMap{y: SingleValue => validateInt(y)} }
-		val ints: Either[LispError, List[Int]]  			  = f(cs)
-		ints.right.map(xs => xs.foldLeft(0)(_ + _))
+		f(cs)
 	}
 
 	// Continuously decreasing (http://stackoverflow.com/q/29349946/409976)
 	private def gtFn(es: List[SExpr], m: M): Either[LispError, Boolean] = {
-		val evald: List[EvalResult] 						  = es.map(evaluate(_)(m))
-		val resultsOnly: List[Either[LispError, SingleValue]] = evald.map(extractComplete)
-		val cs: List[Either[LispError, Int]]    			  = resultsOnly.map{x => x.right.flatMap{y: SingleValue => validateInt(y)} }
-		val ints: Either[LispError, List[Int]]  			  = f(cs)
+		val ints: Either[LispError, List[Int]] = getInts(es, m)
 		ints.right.map(decreasing(_)) 
 	}
 
@@ -124,10 +125,7 @@ object LispInterpretter {
 
 	// TODO: DRY up - remove boilerplate from gtFn and eqFn
 	private def eqFn(es: List[SExpr], m: M): Either[LispError, Boolean] = {
-		val evald: List[EvalResult] 				  	      = es.map(evaluate(_)(m))
-		val resultsOnly: List[Either[LispError, SingleValue]] = evald.map(extractComplete)
-		val cs: List[Either[LispError, Int]]    	  		  = resultsOnly.map{x => x.right.flatMap{y: SingleValue => validateInt(y)} }
-		val ints: Either[LispError, List[Int]]  	  		  = f(cs)
+		val ints: Either[LispError, List[Int]] = getInts(es, m)
 		ints.right.map(allEquals(_)) 
 	}
 
