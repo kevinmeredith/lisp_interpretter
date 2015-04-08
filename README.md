@@ -80,6 +80,15 @@ Complete(Right((330,Map(f -> <function1>, g -> <function1>, z -> 300))))
 Complete(Right((12341234,Map(f -> <function1>, g -> <function1>, z -> 300))))
 ```
 
+**Using `set!` with lambda**
+```
+>(set! x ((lambda (y) (+ y y)) 3))
+Complete(Right((Val(SetOp(x,6)),Map(x -> Val(6)))))
+>x
+Complete(Right((Val(6),Map(x -> Val(6)))))
+>x
+```
+
 ## Testing
 
 There are two [Scalatest](http://www.scalatest.org/) tests:
