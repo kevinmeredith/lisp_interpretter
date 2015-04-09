@@ -20,21 +20,21 @@ object LispInterpretter {
 				case Ident(proc) :: xs							 => handleProc(proc, xs, map) 
 				case Nil										 => Left((EmptyExpression, map))
 				case Comb(Ident("lambda") :: xs) :: inputs       => handleLambda(xs)(map)(inputs)
-				case _									         => Left((ProcError(""), map))
+				case _									         => Left((ProcError(""), map)) // TODO: better error info
 			}
 		}
 
 	// Using default inputs in the event that no `define` accompanies the `inputs`.
-	private def handleLambda(es: List[SExpr])(map: M)(inputs: List[Any]): Either[(LispError, M), (MValue, M)] = es match {
+	private def handleLambda(es: List[SExpr])(map: M)(inputs: List[SExpr]): Either[(LispError, M), (MValue, M)] = es match {
 		case Comb(es) :: fn :: Nil => handleFunction(es, map, fn)(inputs)
 		case _ 				       => Left((BadLambda, map))
 	}
 
-	private def handleFunction(es: List[SExpr], map: M, fn: SExpr)(inputs: List[Any]): Either[(LispError, M), (MValue, M)] = {
+	private def handleFunction(es: List[SExpr], map: M, fn: SExpr)(inputs: List[SExpr]): Either[(LispError, M), (MValue, M)] = {
 		val vars: Either[InvalidLambda, List[String]] = getVars(es)
 		vars match {
 			case Right(xs) => {
-				val locals: Either[InvalidLambda, M] = getAppliedValues(xs)(inputs) 
+				val locals: Either[LispError, M] = getAppliedValues(xs)(inputs)(map) 
 				locals match {
 					case Right(lcls) => applyFn(map, fn, lcls)
 					case Left(x)     => Left((x, map))
@@ -44,9 +44,15 @@ object LispInterpretter {
 		}
 	}
 
-	private def getAppliedValues(vars: List[String])(inputs: List[Any]): Either[InvalidLambda, M] = {
+	private def getAppliedValues(vars: List[String])(inputs: List[SExpr])(map: M): Either[LispError, M] = {
 		if(vars.length == inputs.length) {
-			Right(vars.zip(inputs.map(Val(_))).toMap)
+			val evald: List[Either[(LispError, M), (MValue, M)]]   = inputs.map(evaluate(_)(map))
+			val results: Either[(LispError, M), List[(MValue,M)]]  = f(evald)
+			val resultsWithoutMap: Either[LispError, List[MValue]] = results match {
+				case Right(xs)     => Right(xs.map{_._1})
+				case Left((err,_)) => Left(err)
+			}
+			resultsWithoutMap.right.map{xs => vars.zip(xs).toMap}
 		}
 		else {
 			Left(WrongNumArgs(vars, inputs))
@@ -176,7 +182,7 @@ object LispInterpretter {
 			case _ 			 => Left((ProcError(proc), map))
 		}
 
-	private def applyLambdaInputs(fn: Function2[List[Any], M, Either[(LispError, M), (MValue, M)]], 
+	private def applyLambdaInputs(fn: Function2[List[SExpr], M, Either[(LispError, M), (MValue, M)]], 
 								  es: List[SExpr], 
 							  	  map: M): Either[(LispError, M), (MValue, M)] = 
 		fn(es, map)
