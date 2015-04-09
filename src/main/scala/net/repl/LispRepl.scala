@@ -11,25 +11,25 @@ import scalaz.effect.IO._
 
 object LispRepl {
 
-	// def runForever(map: M): IO[Unit] = for {
-	// 	input  <- readLn
-	// 	_      <- putStrLn(s">$input")
-	// 	result <- IO(runSingle(input, map))
-	// 	_ 	   <- putStrLn(result.toString)
-	// 	_ 	   <- runForever(getMap(result, map))
-	// } yield ()
+	def runForever(map: M): IO[Unit] = for {
+		input  <- readLn
+		_      <- putStrLn(s">$input")
+		result <- IO(runSingle(input, map))
+		_ 	   <- putStrLn(result.toString)
+		_ 	   <- runForever(getMap(result, map))
+	} yield ()
 
-	// def runSingle(input: String, map: M): EvalResult = 
-	// 	parse(input) match {
-	// 		case Success(e)  => interpret(e, map)
-	// 		case Failure(ex) => Left((ParseError(ex), map))
-	// 	}
+	def runSingle(input: String, map: M): Either[(LispError, M), (MValue, M)] = 
+		parse(input) match {
+			case Success(e)  => interpret(e, map)
+			case Failure(ex) => Left((ParseError(ex), map))
+		}
 
-	// def interpret(s: SExpr, map: M): EvalResult = 
-	// 	LispInterpretter.evaluate(s)(map)
+	def interpret(s: SExpr, map: M): Either[(LispError, M), (MValue, M)] = 
+		LispInterpretter.evaluate(s)(map)
 
-	// def parse(x: String): Try[SExpr] = 
-	// 	new LispParser(x).SExprComplete.run() 
+	def parse(x: String): Try[SExpr] = 
+		new LispParser(x).SExprComplete.run() 
 	
 	def getMap(res: Either[(LispError, M), (MValue, M)], previousMap: M): M = res match {
 		case Right((_, m)) => m
