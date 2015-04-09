@@ -31,7 +31,7 @@ object AST {
 	sealed trait MValue
 	sealed trait SingleValue extends MValue
 	case class Val(x: Any) extends SingleValue
-	case class Fn(f: Function2[List[Any], M, Either[(LispError, M), (MValue, M)]]) extends MValue
+	case class Fn(f: Function2[List[SExpr], M, Either[(LispError, M), (MValue, M)]]) extends MValue
 
 	type M = Map[String, MValue]
 

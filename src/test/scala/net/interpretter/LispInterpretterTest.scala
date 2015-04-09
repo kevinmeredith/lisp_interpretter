@@ -231,6 +231,13 @@ class LispInterpretterTest extends FlatSpec {
 		testSuccessfulEval(parsed, Right((Val(63), empty)), empty)
 	}	
 
+	"The Lisp Interpretter" should "evaluate apply a lambda's result to a defined function" in {
+		val defined   = new LispParser("(define f (lambda (x) (+ x 10)))").SExprComplete.run()
+		val evald     = LispInterpretter.evaluate(defined.get)(empty)
+		val newMap: M = evald match { case Right((_, m)) => m }
+		val res       = new LispParser("(f ((lambda (x) (+ x x)) 10))").SExprComplete.run()
+		testSuccessfulEval(res, Right((Val(30), newMap)), newMap)
+	}
 
 	def testSuccessfulEval(parsed: Try[SExpr], 
 						   expected: Either[(LispError, M), (MValue, M)], 
