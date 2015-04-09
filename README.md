@@ -99,5 +99,5 @@ There are two [Scalatest](http://www.scalatest.org/) tests:
 ## TODO
 
 * show actual text when user types it in the REPL
-* re-visit `EvalResult` as the return type - it's not a Monad
+* use monadic chaining (rather than pattern matching) 
 
