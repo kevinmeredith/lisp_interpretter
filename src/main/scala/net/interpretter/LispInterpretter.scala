@@ -6,6 +6,21 @@ object LispInterpretter {
 	
 	import net.common.Error._
 
+	def evaluateSExprs(es: Seq[SExpr], map: M): List[Either[(LispError, M), (MValue, M)]] = {
+		val zero: (List[Either[(LispError, M), (MValue, M)]], M) = (Nil, map)
+
+		val (results, _) = 
+			es.foldLeft(zero){
+				(acc, elem) => { 
+					val (previous, m) = acc
+					val result        = LispInterpretter.evaluate(elem)(m)
+					(previous ++ List(result), sndE(result))
+			}
+		}
+
+		results
+	}
+
 	def evaluate(e: SExpr)(map: M): Either[(LispError, M), (MValue, M)] =
 		e match {
 			case Number(n) 					    => Right((Val(n), map))
@@ -215,4 +230,16 @@ object LispInterpretter {
 			}
 		}
 	}
+
+    def sndE[A, B, C, D](e: Either[(A, Map[C,D]), (B, Map[C,D])]): Map[C, D] = e match {
+		case Right((_, m)) => m
+		case Left((_, m))  => m
+	}
+
+	// TODO: not sure if this is necessary. Returning a Left should still have the right map
+	// def getMap(res: Either[(LispError, M), (MValue, M)], previousMap: M): M = res match {
+	// 	case Right((_, m)) => m
+	// 	case Left(_)       => previousMap
+	// }	
 }
+

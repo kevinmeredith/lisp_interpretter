@@ -24,6 +24,5 @@ object Error {
 	case object BadLambda                                            extends InvalidLambda
 
 	sealed trait MathError 		   extends InterpretterError
-	case class NotAnInt(x: String) extends MathError
-
+	case class NotAnInt(x: String) extends MathError	
 }

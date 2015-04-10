@@ -74,8 +74,6 @@ Complete(Left((NoVarExists,Map(f -> <function1>, g -> <function1>))))
 Complete(Right(((),Map(f -> <function1>, g -> <function1>, z -> 300))))
 >(g 30)
 Complete(Right((330,Map(f -> <function1>, g -> <function1>, z -> 300))))
->12341234
-Complete(Right((12341234,Map(f -> <function1>, g -> <function1>, z -> 300))))
 ```
 
 **Using `set!` with lambda**
