@@ -11,6 +11,7 @@ import scalaz.effect.IO._
 
 object LispRepl {
 
+	// Evaluates a single SExpr at a time, recursively using the Map
 	def runForever(map: M): IO[Unit] = for {
 		input  <- readLn
 		_      <- putStrLn(s">$input")
@@ -19,47 +20,24 @@ object LispRepl {
 		_ 	   <- runForever(sndE(result))
 	} yield ()
 
-	def runSingle(input: String, map: M): Either[(LispError, M), (MValue, M)] = 
+	private def runSingle(input: String, map: M): Either[(LispError, M), (MValue, M)] = 
 		parse(input) match {
 			case Success(e)  => interpret(e, map)
 			case Failure(ex) => Left((ParseError(ex), map))
 		}
 
-	def interpret(s: SExpr, map: M): Either[(LispError, M), (MValue, M)] = 
+	private def interpret(s: SExpr, map: M): Either[(LispError, M), (MValue, M)] = 
 		LispInterpretter.evaluate(s)(map)
 
-	def parse(x: String): Try[SExpr] = 
+	private def parse(x: String): Try[SExpr] = 
 		new LispParser(x).OneSExpr.run() 
 
-	// def evalString(exprs: String, delimiter: String): Either[LispError, List[Either[(LispError, M), (MValue, M)]]] = {
-	// 	val inputs: List[String]    				     = exprs.split(delimiter)
-	// 	val parsed: List[Try[SExpr]] 				  	 = inputs.map(new LispParser(_).SExprComplete.run())
-	// 	val collected: (List[LispError], List[SExpr])    = getParsedResult(parsed)
-	// 	val result: Either[List[LispError], List[SExpr]] = collected match {
-	// 		case (Nil, xs) => Right(xs)
-	// 		case (xs, _ )  => Left(xs)
-	// 	}
-	// 	g(result)
-	// }
-
-	// def g(parsed: Either[List[LispError], List[SExpr]]): Either[LispError, List[Either[(LispError, M), (MValue, M)]]] = {
-	// 	lazy val accumulator: (M, List[MValue], MValue) = (Map(), )
-
-	// 	parsed match {
-	// 		case Right(es)      => es.foldLeft()
-	// 		case Left(err :: _) => Left(err)
-	// 		//case Left(Nil)      => // use scalaz NonEmptyList?
-	// 	}
-	// }
-
-	// private def getParsedResult(parsed: List[Try[SExpr]]): (List[LispError], List[SExpr]) = 
-	// 	parsed.foldRight(List[SExpr]()) {
-	// 		(parsed, acc) => {
-	// 			val (errs, es) = acc
-	// 			parsed match {
-	// 				case Failure(ex) => (ParseError(ex) :: errs, es)
-	// 				case Success(e)  => (errs, e :: es)
-	// 			}
-	// 		}
-	// 	}
+	// TODO: evaluate like Racket?
+	def evalString(exprs: String): Either[LispError, List[Either[(LispError, M), (MValue, M)]]] = {
+		val parsed: Try[Seq[SExpr]] = new LispParser(exprs).SExprs.run()
+		parsed match {
+			case Success(sexprs) => Right(evaluateSExprs(sexprs, Map()))
+			case Failure(f)      => Left(ParseError(f)) // TODO: more info on parse failure
+		}
+	}
 }
