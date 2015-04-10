@@ -231,7 +231,7 @@ object LispInterpretter {
 		}
 	}
 
-	private def sndE[A, B, C, D](e: Either[(A, Map[C,D]), (B, Map[C,D])]): Map[C, D] = e match {
+    def sndE[A, B, C, D](e: Either[(A, Map[C,D]), (B, Map[C,D])]): Map[C, D] = e match {
 		case Right((_, m)) => m
 		case Left((_, m))  => m
 	}
