@@ -1,4 +1,6 @@
-name := "Lisp Interpretter."
+name := "Lisp Interpretter"
+
+organization := "net.lisp"
 
 version := "1.0"
 
